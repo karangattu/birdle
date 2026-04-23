@@ -2,8 +2,6 @@
 
 A fast-paced backyard bird-spotting game. Birds appear in the trees — tap the matching button before they fly off. Build combos for big multipliers; misidentify and lose points (and your streak).
 
-🎮 **Play:** once deployed, your game lives at `https://<your-username>.github.io/birdle/`.
-
 ## How to play
 1. **Start** the game from the title screen.
 2. Choose a difficulty:
