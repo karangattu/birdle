@@ -46,6 +46,7 @@ const $ = (sel) => document.querySelector(sel);
 const screens = {
   start:      $('#screen-start'),
   difficulty: $('#screen-difficulty'),
+  howto:      $('#screen-howto'),
   game:       $('#screen-game'),
   end:        $('#screen-end'),
 };
@@ -461,8 +462,14 @@ function init() {
   $('#btn-home').addEventListener('click', () => showScreen('start'));
 
   document.querySelectorAll('.diff-btn').forEach(b => {
-    b.addEventListener('click', () => startGame(b.dataset.level));
+    b.addEventListener('click', () => {
+      state.level = b.dataset.level;
+      showScreen('howto');
+    });
   });
+
+  $('#btn-howto-play').addEventListener('click', () => startGame(state.level));
+  $('#btn-howto-back').addEventListener('click', () => showScreen('difficulty'));
 
   // Register service worker for offline play
   if ('serviceWorker' in navigator) {
