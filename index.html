@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Birdle</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#2e8b2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Birdle" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="icon" href="assets/sfbbo_logo.png" />
+  <link rel="apple-touch-icon" href="assets/sfbbo_logo.png" />
+</head>
+<body>
+  <div id="app">
+    <!-- Start Screen -->
+    <section id="screen-start" class="screen active">
+      <div class="poster" style="background-image: url('assets/Birdle%20game%20poster.jpg');"></div>
+      <img class="org-logo" src="assets/sfbbo_logo.png" alt="SFBBO" />
+      <div class="start-overlay">
+        <button id="btn-start" class="big-btn">Start Game</button>
+        <p class="hint">Spot the birds. Tap the matching button. Don't get fooled.</p>
+      </div>
+    </section>
+
+    <!-- Difficulty Screen -->
+    <section id="screen-difficulty" class="screen">
+      <div class="modal">
+        <h1>Choose your level</h1>
+        <div class="diff-buttons">
+          <button class="diff-btn" data-level="regular">
+            <span class="diff-icon" aria-hidden="true">
+              <!-- lucide: binoculars -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10h4"/><path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/><path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/><path d="M5 7h14"/><path d="M19 7c1.5 2.5 2 5 2 7.5a4.5 4.5 0 1 1-9 0v-1a2 2 0 0 0-4 0v1a4.5 4.5 0 1 1-9 0C-1 12 -.5 9.5 1 7" transform="translate(2 0)"/></svg>
+            </span>
+            <span class="diff-title">Regular</span>
+            <span class="diff-sub">Slower birds · fewer at a time · 60s</span>
+          </button>
+          <button class="diff-btn expert" data-level="expert">
+            <span class="diff-icon" aria-hidden="true">
+              <!-- lucide: zap -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </span>
+            <span class="diff-title">Expert</span>
+            <span class="diff-sub">Faster birds · crowded skies · 60s</span>
+          </button>
+        </div>
+        <button id="btn-back-start" class="link-btn">← Back</button>
+      </div>
+    </section>
+
+    <!-- Game Screen -->
+    <section id="screen-game" class="screen">
+      <div id="backdrop"></div>
+      <div id="bird-layer"></div>
+
+      <div id="hud">
+        <div class="hud-item"><span class="lbl">Score</span><span id="score">0</span></div>
+        <div class="hud-item"><span class="lbl">Combo</span><span id="combo">x1</span></div>
+        <div class="hud-item"><span class="lbl">Time</span><span id="time">60</span></div>
+        <button id="btn-quit" class="link-btn quit">Quit</button>
+      </div>
+
+      <div id="popup-layer"></div>
+
+      <img id="binoculars" src="assets/binocular.png" alt="binoculars" />
+
+      <div id="bird-buttons"></div>
+
+      <div id="countdown" class="hidden">
+        <div id="countdown-num">3</div>
+        <div id="countdown-sub">Get ready to spot…</div>
+      </div>
+    </section>
+
+    <!-- Game Over -->
+    <section id="screen-end" class="screen">
+      <div class="modal">
+        <h1 id="end-title">Time's up!</h1>
+        <div class="rank">
+          <svg id="rank-icon" class="rank-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+          <div id="rank-title" class="rank-title">Bird Watcher</div>
+          <div id="rank-sub" class="rank-sub"></div>
+        </div>
+        <p class="final">Final score: <span id="final-score">0</span></p>
+        <p class="stats">
+          Best combo: <span id="best-combo">x1</span> ·
+          Hits: <span id="hits">0</span> ·
+          Misses: <span id="misses">0</span>
+        </p>
+        <p id="best-record" class="best"></p>
+        <div class="end-buttons">
+          <button id="btn-replay" class="big-btn">Play Again</button>
+          <button id="btn-home" class="link-btn">Home</button>
+        </div>
+        <div class="sfbbo-plug">
+          <p class="sfbbo-line">Loved spotting these birds? Real ones need real eyes.</p>
+          <p class="sfbbo-line">Join <strong>San Francisco Bay Bird Observatory</strong> on actual field surveys.</p>
+          <a class="sfbbo-link" href="https://sfbbo.org" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            Visit sfbbo.org
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rotate-device prompt for portrait phones/tablets -->
+    <div id="rotate-overlay">
+      <div class="rotate-inner">
+        <div class="rotate-icon">📱↻</div>
+        <h2>Please rotate your device</h2>
+        <p>Birdle plays best in landscape orientation.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/game.js" type="module"></script>
+</body>
+</html>

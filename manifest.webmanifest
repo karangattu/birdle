@@ -1,0 +1,16 @@
+{
+  "name": "Birdle",
+  "short_name": "Birdle",
+  "description": "Backyard bird-spotting game by SFBBO.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0d1a0d",
+  "theme_color": "#2e8b2e",
+  "icons": [
+    { "src": "assets/sfbbo_logo.png", "sizes": "any", "type": "image/png", "purpose": "any" },
+    { "src": "assets/sfbbo_logo.png", "sizes": "any", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/Birdle game poster.jpg", "sizes": "any", "type": "image/jpeg", "purpose": "any" }
+  ]
+}
