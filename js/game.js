@@ -47,6 +47,7 @@ const screens = {
   start:      $('#screen-start'),
   difficulty: $('#screen-difficulty'),
   howto:      $('#screen-howto'),
+  training:   $('#screen-training'),
   game:       $('#screen-game'),
   end:        $('#screen-end'),
 };
@@ -421,6 +422,7 @@ function endGame() {
       `${state.level === 'expert' ? 'Expert' : 'Regular'} best: ${best}` + (isNew ? ' — NEW!' : '');
   } catch (_) { /* ignore */ }
 
+  refreshBestPreview();
   showScreen('end');
 }
 
@@ -451,6 +453,175 @@ function beep(freq, dur) {
   } catch (_) { /* no audio */ }
 }
 
+// ---------- High-score / settings persistence ----------
+const TRAINED_KEY = 'birdle_trained';
+const BEST_KEYS = ['birdle_best_regular', 'birdle_best_expert'];
+
+function isTrained() {
+  try { return localStorage.getItem(TRAINED_KEY) === '1'; } catch (_) { return false; }
+}
+function markTrained() {
+  try { localStorage.setItem(TRAINED_KEY, '1'); } catch (_) { /* ignore */ }
+}
+
+function refreshBestPreview() {
+  const el = $('#start-bests');
+  if (!el) return;
+  let r = 0, e = 0;
+  try {
+    r = parseInt(localStorage.getItem('birdle_best_regular') || '0', 10);
+    e = parseInt(localStorage.getItem('birdle_best_expert')  || '0', 10);
+  } catch (_) { /* ignore */ }
+  el.textContent = (r || e) ? `Best — Regular: ${r}  ·  Expert: ${e}` : '';
+}
+
+let _feedbackTimer = 0;
+function flashStartFeedback(msg) {
+  const el = $('#start-feedback');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_feedbackTimer);
+  _feedbackTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function resetBestScores() {
+  if (!confirm('Clear your best scores for both Regular and Expert? This cannot be undone.')) return;
+  try { BEST_KEYS.forEach(k => localStorage.removeItem(k)); } catch (_) { /* ignore */ }
+  refreshBestPreview();
+  flashStartFeedback('Best scores cleared.');
+}
+
+function replayTutorial() {
+  try { localStorage.removeItem(TRAINED_KEY); } catch (_) { /* ignore */ }
+  flashStartFeedback('Tutorial will play before your next game.');
+}
+
+// ---------- Training (interactive walkthrough) ----------
+const TRAINING_STEPS = [
+  {
+    species: 'american_robin',
+    msg: 'A bird appeared in the trees! Tap the matching button below to identify it.',
+    hint: true,
+  },
+  {
+    species: 'scrub_jay',
+    msg: 'Nice! One more — try this one without a hint. (In the real game, wrong taps cost points.)',
+    hint: false,
+  },
+];
+
+const trainingState = { step: 0, birdEl: null, buttonsBuilt: false };
+
+function buildTrainingButtons() {
+  const root = $('#training-buttons');
+  root.innerHTML = '';
+  for (const b of BIRDS) {
+    const btn = document.createElement('button');
+    btn.className = 'bird-btn';
+    btn.dataset.species = b.id;
+    btn.innerHTML = `<img src="${b.img}" alt="${b.name}" /><span>${b.name}</span>`;
+    btn.addEventListener('click', () => onTrainingGuess(b.id, btn));
+    root.appendChild(btn);
+  }
+}
+
+function startTraining() {
+  if (!trainingState.buttonsBuilt) {
+    buildTrainingButtons();
+    trainingState.buttonsBuilt = true;
+  }
+  trainingState.step = 0;
+  $('#training-bird-layer').innerHTML = '';
+  showScreen('training');
+  // Wait one frame so the screen has its final size before placing the bird.
+  requestAnimationFrame(presentTrainingStep);
+}
+
+function presentTrainingStep() {
+  const step = TRAINING_STEPS[trainingState.step];
+  if (!step) return finishTraining();
+
+  $('#training-step-num').textContent = trainingState.step + 1;
+  $('#training-msg').textContent = step.msg;
+
+  // Reset hint highlights
+  document.querySelectorAll('#training-buttons .bird-btn').forEach(b => b.classList.remove('hint-glow'));
+  if (step.hint) {
+    const btn = document.querySelector(`#training-buttons .bird-btn[data-species="${step.species}"]`);
+    if (btn) btn.classList.add('hint-glow');
+  }
+
+  spawnTrainingBird(step.species);
+}
+
+function spawnTrainingBird(speciesId) {
+  const species = BIRDS.find(b => b.id === speciesId);
+  if (!species) return;
+  const layer = $('#training-bird-layer');
+  layer.innerHTML = '';
+
+  const rect = screens.training.getBoundingClientRect();
+  const baseSize = Math.min(rect.width, rect.height);
+  const size = Math.round(baseSize * 0.16);
+
+  const xMin = TREE_ZONE.xMin * rect.width;
+  const xMax = TREE_ZONE.xMax * rect.width  - size;
+  const yMin = TREE_ZONE.yMin * rect.height + 60; // leave room for banner
+  const yMax = TREE_ZONE.yMax * rect.height - size;
+
+  const el = document.createElement('div');
+  el.className = 'bird training-bird';
+  el.style.width  = size + 'px';
+  el.style.height = size + 'px';
+  el.style.left   = rand(xMin, xMax) + 'px';
+  el.style.top    = rand(yMin, yMax) + 'px';
+  el.innerHTML = `<img src="${species.img}" alt="${species.name}" draggable="false" />`;
+  layer.appendChild(el);
+  trainingState.birdEl = el;
+}
+
+function onTrainingGuess(speciesId, btnEl) {
+  const step = TRAINING_STEPS[trainingState.step];
+  if (!step) return;
+
+  if (speciesId === step.species) {
+    flashBtn(btnEl, 'flash-correct');
+    btnEl.classList.remove('hint-glow');
+    if (trainingState.birdEl) {
+      const dying = trainingState.birdEl;
+      dying.classList.add('caught');
+      setTimeout(() => dying.remove(), 450);
+    }
+    beep(880, 0.07);
+    vibrate([30, 20, 30]);
+    trainingState.step++;
+    setTimeout(presentTrainingStep, 700);
+  } else {
+    flashBtn(btnEl, 'flash-wrong');
+    beep(180, 0.12);
+    vibrate(120);
+    $('#training-msg').textContent = "Not quite — that's a different bird. Try again!";
+  }
+}
+
+function finishTraining() {
+  $('#training-step-num').textContent = '✓';
+  $('#training-msg').textContent = "You're ready. Good luck out there!";
+  markTrained();
+  setTimeout(() => startGame(state.level), 900);
+}
+
+function skipTraining() {
+  markTrained();
+  startGame(state.level);
+}
+
+function beginPlay() {
+  if (isTrained()) startGame(state.level);
+  else startTraining();
+}
+
 // ---------- Wire up ----------
 function init() {
   buildBirdButtons();
@@ -468,8 +639,14 @@ function init() {
     });
   });
 
-  $('#btn-howto-play').addEventListener('click', () => startGame(state.level));
+  $('#btn-howto-play').addEventListener('click', beginPlay);
   $('#btn-howto-back').addEventListener('click', () => showScreen('difficulty'));
+
+  $('#btn-training-skip').addEventListener('click', skipTraining);
+  $('#btn-reset-scores').addEventListener('click', resetBestScores);
+  $('#btn-replay-tutorial').addEventListener('click', replayTutorial);
+
+  refreshBestPreview();
 
   // Register service worker for offline play
   if ('serviceWorker' in navigator) {

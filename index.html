@@ -23,6 +23,30 @@
       <div class="start-overlay">
         <button id="btn-start" class="big-btn">Start Game</button>
         <p class="hint">Spot the birds. Tap the matching button. Don't get fooled.</p>
+        <p id="start-bests" class="start-bests"></p>
+        <div class="start-footer">
+          <button id="btn-replay-tutorial" class="link-btn">Replay tutorial</button>
+          <span class="dot">·</span>
+          <button id="btn-reset-scores" class="link-btn">Reset best scores</button>
+        </div>
+        <p id="start-feedback" class="start-feedback" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- Training Screen (interactive walkthrough before first game) -->
+    <section id="screen-training" class="screen">
+      <div id="training-backdrop"></div>
+      <div id="training-bird-layer"></div>
+
+      <div id="training-banner">
+        <div class="training-step">Quick training · Step <span id="training-step-num">1</span> of 2</div>
+        <div class="training-msg" id="training-msg">A bird appeared! Tap the matching button below to identify it.</div>
+      </div>
+
+      <div id="training-buttons"></div>
+
+      <div class="training-footer">
+        <button id="btn-training-skip" class="link-btn">Skip tutorial →</button>
       </div>
     </section>
 
