@@ -8,8 +8,8 @@ html, body, #app {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #fff;
   background: #1a2a1a;
-  user-select: none;
   -webkit-user-select: none;
+  user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -415,6 +415,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .bird-btn {
   background: rgba(255,255,255,0.92);
   color: #1a2a1a;
+  touch-action: manipulation;
   border-radius: 12px;
   padding: 6px 4px 4px;
   display: flex;

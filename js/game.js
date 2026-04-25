@@ -15,6 +15,8 @@ const BIRDS = [
 ];
 
 const BIRD_CALL_VOLUME = 0.42;
+const EXPIRED_GUESS_GRACE_MS = 250;
+const POINTER_CLICK_SUPPRESS_MS = 700;
 
 const DIFFICULTY = {
   regular: {
@@ -70,6 +72,7 @@ const state = {
   misses: 0,
   timeLeft: 60,
   active: new Map(),       // birdEl id -> { species, el, expireAt, call }
+  recentlyExpired: [],     // birds that vanished during a just-started tap
   spawnTimer: null,
   tickTimer: null,
   endAt: 0,
@@ -92,9 +95,29 @@ function buildBirdButtons() {
     btn.className = 'bird-btn';
     btn.dataset.species = b.id;
     btn.innerHTML = `<img src="${b.img}" alt="${b.name}" /><span>${b.name}</span>`;
-    btn.addEventListener('click', () => onGuess(b.id, btn));
+    bindInstantPress(btn, () => onGuess(b.id, btn));
     buttonsEl.appendChild(btn);
   }
+}
+
+function bindInstantPress(button, handler) {
+  let suppressClickUntil = 0;
+
+  button.addEventListener('pointerdown', (event) => {
+    if (event.isPrimary === false || event.button > 0) return;
+    suppressClickUntil = performance.now() + POINTER_CLICK_SUPPRESS_MS;
+    try { button.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
+    event.preventDefault();
+    handler(event);
+  });
+
+  button.addEventListener('click', (event) => {
+    if (performance.now() < suppressClickUntil) {
+      event.preventDefault();
+      return;
+    }
+    handler(event);
+  });
 }
 
 // ---------- Spawning ----------
@@ -160,7 +183,7 @@ function spawnBird(species) {
   const life = rand(cfg.birdLifeMin, cfg.birdLifeMax);
   const expireAt = performance.now() + life;
   const entry = { species: species.id, el, expireAt, timeoutId: 0, call: playBirdCall(species) };
-  entry.timeoutId = setTimeout(() => removeBird(id, false), life);
+  entry.timeoutId = setTimeout(() => removeBird(id, false, true), life);
   state.active.set(id, entry);
 }
 
@@ -196,15 +219,54 @@ function collidesAny(p, size) {
   return false;
 }
 
-function removeBird(id, caught) {
+function removeBird(id, caught, allowGrace = false) {
   const entry = state.active.get(id);
   if (!entry) return;
   clearTimeout(entry.timeoutId);
   stopBirdCall(entry.call);
+  const shouldRemember = allowGrace && !caught && state.running;
   state.active.delete(id);
 
   entry.el.classList.add(caught ? 'caught' : 'leaving');
-  setTimeout(() => entry.el.remove(), 450);
+  const removalTimeoutId = setTimeout(() => entry.el.remove(), 450);
+  if (shouldRemember) rememberRecentlyExpiredBird(entry, removalTimeoutId);
+}
+
+function rememberRecentlyExpiredBird(entry, removalTimeoutId) {
+  const now = performance.now();
+  pruneRecentlyExpiredBirds(now);
+  state.recentlyExpired.push({
+    species: entry.species,
+    el: entry.el,
+    removalTimeoutId,
+    expiredAt: now,
+    graceUntil: now + EXPIRED_GUESS_GRACE_MS,
+  });
+}
+
+function pruneRecentlyExpiredBirds(now = performance.now()) {
+  state.recentlyExpired = state.recentlyExpired.filter(entry =>
+    entry.graceUntil >= now && entry.el.isConnected
+  );
+}
+
+function claimRecentlyExpiredBird(speciesId) {
+  const now = performance.now();
+  pruneRecentlyExpiredBirds(now);
+
+  let match = null;
+  let matchIndex = -1;
+  for (let index = 0; index < state.recentlyExpired.length; index++) {
+    const entry = state.recentlyExpired[index];
+    if (entry.species !== speciesId) continue;
+    if (!match || entry.expiredAt > match.expiredAt) {
+      match = entry;
+      matchIndex = index;
+    }
+  }
+
+  if (matchIndex >= 0) state.recentlyExpired.splice(matchIndex, 1);
+  return match;
 }
 
 // ---------- Guessing ----------
@@ -223,6 +285,8 @@ function onGuess(speciesId, btnEl) {
     }
   }
 
+  if (!match) match = claimRecentlyExpiredBird(speciesId);
+
   if (match) {
     state.hits++;
     state.combo += 1;
@@ -235,7 +299,14 @@ function onGuess(speciesId, btnEl) {
     spawnPopup(match.el, `+${gained}`, 'plus');
     beep(880, 0.07);
     vibrate([30, 20, 30]);
-    removeBird(matchId, true);
+    if (matchId !== null) {
+      removeBird(matchId, true);
+    } else {
+      clearTimeout(match.removalTimeoutId);
+      match.el.classList.remove('leaving');
+      match.el.classList.add('caught');
+      setTimeout(() => match.el.remove(), 450);
+    }
   } else {
     state.misses++;
     state.combo = 1;
@@ -361,6 +432,7 @@ function startGame(level) {
   birdLayer.innerHTML = '';
   popupLayer.innerHTML = '';
   state.active.clear();
+  state.recentlyExpired = [];
 
   updateHUD();
   showScreen('game');
@@ -406,6 +478,7 @@ function endGame() {
   clearInterval(state.tickTimer);
 
   // Clear remaining birds
+  state.recentlyExpired = [];
   for (const [id] of state.active) removeBird(id, false);
 
   $('#final-score').textContent = state.score;
@@ -438,6 +511,7 @@ function quitToHome() {
   birdLayer.innerHTML = '';
   popupLayer.innerHTML = '';
   state.active.clear();
+  state.recentlyExpired = [];
   showScreen('start');
 }
 
@@ -588,7 +662,7 @@ function buildTrainingButtons() {
     btn.className = 'bird-btn';
     btn.dataset.species = b.id;
     btn.innerHTML = `<img src="${b.img}" alt="${b.name}" /><span>${b.name}</span>`;
-    btn.addEventListener('click', () => onTrainingGuess(b.id, btn));
+    bindInstantPress(btn, () => onTrainingGuess(b.id, btn));
     root.appendChild(btn);
   }
 }
