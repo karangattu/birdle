@@ -595,15 +595,7 @@ function stopAllBirdCalls() {
 }
 
 // ---------- High-score / settings persistence ----------
-const TRAINED_KEY = 'birdle_trained';
 const BEST_KEYS = ['birdle_best_regular', 'birdle_best_expert'];
-
-function isTrained() {
-  try { return localStorage.getItem(TRAINED_KEY) === '1'; } catch (_) { return false; }
-}
-function markTrained() {
-  try { localStorage.setItem(TRAINED_KEY, '1'); } catch (_) { /* ignore */ }
-}
 
 function refreshBestPreview() {
   const el = $('#start-bests');
@@ -633,10 +625,6 @@ function resetBestScores() {
   flashStartFeedback('Best scores cleared.');
 }
 
-function replayTutorial() {
-  try { localStorage.removeItem(TRAINED_KEY); } catch (_) { /* ignore */ }
-  flashStartFeedback('Tutorial will play before your next game.');
-}
 
 // ---------- Training (interactive walkthrough) ----------
 const TRAINING_STEPS = [
@@ -755,20 +743,17 @@ function onTrainingGuess(speciesId, btnEl) {
 function finishTraining() {
   $('#training-step-num').textContent = '✓';
   $('#training-msg').textContent = "You're ready. Good luck out there!";
-  markTrained();
   setTimeout(() => startGame(state.level), 900);
 }
 
 function skipTraining() {
-  markTrained();
   stopAllBirdCalls();
   startGame(state.level);
 }
 
 function beginPlay() {
   preloadBirdCalls();
-  if (isTrained()) startGame(state.level);
-  else startTraining();
+  startTraining();
 }
 
 // ---------- Wire up ----------
@@ -796,7 +781,6 @@ function init() {
 
   $('#btn-training-skip').addEventListener('click', skipTraining);
   $('#btn-reset-scores').addEventListener('click', resetBestScores);
-  $('#btn-replay-tutorial').addEventListener('click', replayTutorial);
 
   refreshBestPreview();
 
