@@ -2,17 +2,19 @@
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
 
 const BIRDS = [
-  { id: 'american_crow',     name: 'American Crow',     img: 'assets/american_crow.png' },
-  { id: 'american_robin',    name: 'American Robin',    img: 'assets/american_robin.png' },
-  { id: 'black_phoebe',      name: 'Black Phoebe',      img: 'assets/black_pheobe.png' },
-  { id: 'california_towhee', name: 'California Towhee', img: 'assets/california_towhee.png' },
-  { id: 'cedar_waxwing',     name: 'Cedar Waxwing',     img: 'assets/cedar_waxwing.png' },
-  { id: 'dark_eyed_junco',   name: 'Dark-eyed Junco',   img: 'assets/dark_eyed_junco.png' },
-  { id: 'hermit_thrush',     name: 'Hermit Thrush',     img: 'assets/hermit_thrush.png' },
-  { id: 'house_finch',       name: 'House Finch',       img: 'assets/house_finch.png' },
-  { id: 'scrub_jay',         name: 'Scrub Jay',         img: 'assets/scrub_jay.png' },
-  { id: 'spotted_towhee',    name: 'Spotted Towhee',    img: 'assets/spotted_towhee.png' },
+  { id: 'american_crow',     name: 'American Crow',     img: 'assets/american_crow.png',     sound: 'assets/american_crow.mp3' },
+  { id: 'american_robin',    name: 'American Robin',    img: 'assets/american_robin.png',    sound: 'assets/american_robin.mp3' },
+  { id: 'black_phoebe',      name: 'Black Phoebe',      img: 'assets/black_phoebe.png',      sound: 'assets/black_phoebe.mp3' },
+  { id: 'california_towhee', name: 'California Towhee', img: 'assets/california_towhee.png', sound: 'assets/california_towhee.mp3' },
+  { id: 'cedar_waxwing',     name: 'Cedar Waxwing',     img: 'assets/cedar_waxwing.png',     sound: 'assets/cedar_waxwing.mp3' },
+  { id: 'dark_eyed_junco',   name: 'Dark-eyed Junco',   img: 'assets/dark_eyed_junco.png',   sound: 'assets/dark_eyed_junco.mp3' },
+  { id: 'hermit_thrush',     name: 'Hermit Thrush',     img: 'assets/hermit_thrush.png',     sound: 'assets/hermit_thrush.mp3' },
+  { id: 'house_finch',       name: 'House Finch',       img: 'assets/house_finch.png',       sound: 'assets/house_finch.mp3' },
+  { id: 'scrub_jay',         name: 'Scrub Jay',         img: 'assets/scrub_jay.png',         sound: 'assets/scrub_jay.mp3' },
+  { id: 'spotted_towhee',    name: 'Spotted Towhee',    img: 'assets/spotted_towhee.png',    sound: 'assets/spotted_towhee.mp3' },
 ];
+
+const BIRD_CALL_VOLUME = 0.42;
 
 const DIFFICULTY = {
   regular: {
@@ -67,7 +69,7 @@ const state = {
   hits: 0,
   misses: 0,
   timeLeft: 60,
-  active: new Map(),       // birdEl id -> { species, el, expireAt }
+  active: new Map(),       // birdEl id -> { species, el, expireAt, call }
   spawnTimer: null,
   tickTimer: null,
   endAt: 0,
@@ -157,7 +159,7 @@ function spawnBird(species) {
 
   const life = rand(cfg.birdLifeMin, cfg.birdLifeMax);
   const expireAt = performance.now() + life;
-  const entry = { species: species.id, el, expireAt, timeoutId: 0 };
+  const entry = { species: species.id, el, expireAt, timeoutId: 0, call: playBirdCall(species) };
   entry.timeoutId = setTimeout(() => removeBird(id, false), life);
   state.active.set(id, entry);
 }
@@ -198,6 +200,7 @@ function removeBird(id, caught) {
   const entry = state.active.get(id);
   if (!entry) return;
   clearTimeout(entry.timeoutId);
+  stopBirdCall(entry.call);
   state.active.delete(id);
 
   entry.el.classList.add(caught ? 'caught' : 'leaving');
@@ -345,6 +348,7 @@ function startTicker() {
 
 // ---------- Lifecycle ----------
 function startGame(level) {
+  stopAllBirdCalls();
   state.level = level;
   state.score = 0;
   state.combo = 1;
@@ -430,6 +434,7 @@ function quitToHome() {
   state.running = false;
   clearTimeout(state.spawnTimer);
   clearInterval(state.tickTimer);
+  stopAllBirdCalls();
   birdLayer.innerHTML = '';
   popupLayer.innerHTML = '';
   state.active.clear();
@@ -451,6 +456,68 @@ function beep(freq, dur) {
     g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
     o.stop(audioCtx.currentTime + dur + 0.02);
   } catch (_) { /* no audio */ }
+}
+
+// ---------- Bird calls ----------
+const birdCallPreloads = new Map();
+const activeBirdCalls = new Set();
+
+function preloadBirdCalls() {
+  for (const bird of BIRDS) {
+    if (birdCallPreloads.has(bird.id)) continue;
+    try {
+      const audio = new Audio(bird.sound);
+      audio.preload = 'auto';
+      audio.load();
+      birdCallPreloads.set(bird.id, audio);
+    } catch (_) { /* no audio */ }
+  }
+}
+
+function playBirdCall(species) {
+  if (!species || !species.sound) return null;
+
+  try {
+    const preload = birdCallPreloads.get(species.id);
+    const audio = preload ? preload.cloneNode(true) : new Audio(species.sound);
+    const call = { audio, stopped: false };
+    const markDone = () => {
+      call.stopped = true;
+      activeBirdCalls.delete(call);
+    };
+
+    audio.preload = 'auto';
+    audio.volume = BIRD_CALL_VOLUME;
+    audio.addEventListener('ended', markDone, { once: true });
+    audio.addEventListener('error', markDone, { once: true });
+    activeBirdCalls.add(call);
+
+    const promise = audio.play();
+    if (promise && typeof promise.catch === 'function') {
+      promise.catch(() => stopBirdCall(call));
+    }
+
+    return call;
+  } catch (_) {
+    return null;
+  }
+}
+
+function stopBirdCall(call) {
+  if (!call || call.stopped) return;
+  call.stopped = true;
+  activeBirdCalls.delete(call);
+
+  try {
+    call.audio.pause();
+    call.audio.currentTime = 0;
+    call.audio.removeAttribute('src');
+    call.audio.load();
+  } catch (_) { /* no audio */ }
+}
+
+function stopAllBirdCalls() {
+  for (const call of [...activeBirdCalls]) stopBirdCall(call);
 }
 
 // ---------- High-score / settings persistence ----------
@@ -511,7 +578,7 @@ const TRAINING_STEPS = [
   },
 ];
 
-const trainingState = { step: 0, birdEl: null, buttonsBuilt: false };
+const trainingState = { step: 0, birdEl: null, buttonsBuilt: false, call: null };
 
 function buildTrainingButtons() {
   const root = $('#training-buttons');
@@ -527,6 +594,7 @@ function buildTrainingButtons() {
 }
 
 function startTraining() {
+  stopAllBirdCalls();
   if (!trainingState.buttonsBuilt) {
     buildTrainingButtons();
     trainingState.buttonsBuilt = true;
@@ -559,6 +627,8 @@ function spawnTrainingBird(speciesId) {
   const species = BIRDS.find(b => b.id === speciesId);
   if (!species) return;
   const layer = $('#training-bird-layer');
+  stopBirdCall(trainingState.call);
+  trainingState.call = null;
   layer.innerHTML = '';
 
   const rect = screens.training.getBoundingClientRect();
@@ -579,6 +649,7 @@ function spawnTrainingBird(speciesId) {
   el.innerHTML = `<img src="${species.img}" alt="${species.name}" draggable="false" />`;
   layer.appendChild(el);
   trainingState.birdEl = el;
+  trainingState.call = playBirdCall(species);
 }
 
 function onTrainingGuess(speciesId, btnEl) {
@@ -588,6 +659,8 @@ function onTrainingGuess(speciesId, btnEl) {
   if (speciesId === step.species) {
     flashBtn(btnEl, 'flash-correct');
     btnEl.classList.remove('hint-glow');
+    stopBirdCall(trainingState.call);
+    trainingState.call = null;
     if (trainingState.birdEl) {
       const dying = trainingState.birdEl;
       dying.classList.add('caught');
@@ -614,10 +687,12 @@ function finishTraining() {
 
 function skipTraining() {
   markTrained();
+  stopAllBirdCalls();
   startGame(state.level);
 }
 
 function beginPlay() {
+  preloadBirdCalls();
   if (isTrained()) startGame(state.level);
   else startTraining();
 }
@@ -626,7 +701,10 @@ function beginPlay() {
 function init() {
   buildBirdButtons();
 
-  $('#btn-start').addEventListener('click', () => showScreen('difficulty'));
+  $('#btn-start').addEventListener('click', () => {
+    preloadBirdCalls();
+    showScreen('difficulty');
+  });
   $('#btn-back-start').addEventListener('click', () => showScreen('start'));
   $('#btn-quit').addEventListener('click', quitToHome);
   $('#btn-replay').addEventListener('click', () => startGame(state.level));

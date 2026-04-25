@@ -1,13 +1,13 @@
 # Birdle 🐦
 
-A fast-paced backyard bird-spotting game. Birds appear in the trees — tap the matching button before they fly off. Build combos for big multipliers; misidentify and lose points (and your streak).
+A fast-paced backyard bird-spotting game. Birds appear in the trees and play their calls - tap the matching button before they fly off. Build combos for big multipliers; misidentify and lose points (and your streak).
 
 ## How to play
 1. **Start** the game from the title screen.
 2. Choose a difficulty:
    - **Regular** – slower birds, fewer at once.
    - **Expert** – faster birds, crowded trees, bigger rewards.
-3. When a bird appears, tap its name from the bottom panel (or tap the bird itself).
+3. When a bird appears, listen for its call and tap its name from the bottom panel.
 4. Correct ID = points + combo multiplier. Wrong ID = points off + combo reset.
 5. You have 60 seconds. Best score per difficulty is saved locally.
 
@@ -33,7 +33,7 @@ A GitHub Actions workflow at [.github/workflows/deploy.yml](.github/workflows/de
 index.html              # Markup + screens (start, difficulty, game, end)
 styles.css              # Layout, animations, responsive HUD
 js/game.js              # Game engine: spawning, scoring, combos, sound
-assets/                 # Backdrop, binoculars, bird images, poster
+assets/                 # Backdrop, binoculars, bird images, bird calls, poster
 .github/workflows/      # GitHub Pages deploy
 ```
 
