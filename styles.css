@@ -142,14 +142,13 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .org-logo {
   position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: clamp(110px, 22vh, 220px);
+  top: max(18px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
+  height: clamp(88px, 16vh, 172px);
   width: auto;
   z-index: 3;
   background: rgba(255,255,255,0.95);
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
@@ -927,9 +926,10 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 @media (orientation: landscape) and (max-height: 520px) {
   .org-logo {
-    top: 8px;
-    height: clamp(64px, 18vh, 96px);
-    padding: 7px 14px;
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    height: clamp(60px, 16vh, 88px);
+    padding: 6px 12px;
     border-radius: 14px;
   }
   .start-overlay {
