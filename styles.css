@@ -878,6 +878,9 @@ button { font-family: inherit; cursor: pointer; border: none; }
   .intro-overlay {
     padding: 16px;
   }
+  .start-overlay {
+    padding-top: clamp(300px, 46vh, 420px);
+  }
   .intro-chrome {
     flex-direction: column;
     align-items: stretch;
