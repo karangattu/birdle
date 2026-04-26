@@ -16,6 +16,27 @@
 </head>
 <body>
   <div id="app">
+    <div id="intro-overlay" class="intro-overlay" aria-label="Birdle intro video" hidden>
+      <video
+        id="intro-video"
+        class="intro-video"
+        muted
+        playsinline
+        preload="metadata"
+        poster="assets/Birdle%20game%20poster.jpg"
+        disablepictureinpicture
+      >
+        <source src="assets/birdle_intro.mp4" type="video/mp4" />
+      </video>
+      <div class="intro-chrome">
+        <div class="intro-copy">
+          <div class="intro-kicker">Birdle</div>
+          <p class="intro-note">A quick look before you choose your difficulty.</p>
+        </div>
+        <button id="btn-skip-intro" class="intro-skip" type="button">Skip Intro</button>
+      </div>
+    </div>
+
     <!-- Start Screen -->
     <section id="screen-start" class="screen active">
       <div class="poster" style="background-image: url('assets/Birdle%20game%20poster.jpg');"></div>

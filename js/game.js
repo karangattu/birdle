@@ -5,6 +5,10 @@ import {
   sortLeaderboardEntries,
   validateLeaderboardName,
 } from './leaderboard-utils.js';
+import {
+  getIntroTimeoutMs,
+  shouldShowIntro,
+} from './intro-utils.js';
 
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
@@ -27,6 +31,8 @@ const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
 const LEADERBOARD_TABLE = 'birdle_leaderboad';
 const LEADERBOARD_NAME_KEY = 'birdle_leaderboard_name';
+const INTRO_SESSION_KEY = 'birdle_intro_seen';
+const INTRO_FALLBACK_MS = 2600;
 const SUPABASE_URL = 'https://ovwktjjeoowlktdfbuuu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU';
 const LEADERBOARD_BADGE_ICONS = {
@@ -95,6 +101,11 @@ const buttonsEl  = $('#bird-buttons');
 const scoreEl    = $('#score');
 const comboEl    = $('#combo');
 const timeEl     = $('#time');
+const introEls = {
+  overlay: $('#intro-overlay'),
+  video: $('#intro-video'),
+  skip: $('#btn-skip-intro'),
+};
 const leaderboardEls = {
   startList: $('#leaderboard-start-list'),
   startStatus: $('#leaderboard-start-status'),
@@ -141,12 +152,143 @@ const leaderboardState = {
   lastSubmittedName: '',
 };
 
+const introState = {
+  timeoutId: 0,
+  hideTimerId: 0,
+  afterFinish: null,
+  playing: false,
+  wired: false,
+};
+
 let nextBirdId = 1;
 
 // ---------- Screen control ----------
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+}
+
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (_) {
+    return false;
+  }
+}
+
+function hasSeenIntro() {
+  try {
+    return sessionStorage.getItem(INTRO_SESSION_KEY) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+function markIntroSeen() {
+  try {
+    sessionStorage.setItem(INTRO_SESSION_KEY, '1');
+  } catch (_) { /* ignore */ }
+}
+
+function clearIntroTimers() {
+  clearTimeout(introState.timeoutId);
+  clearTimeout(introState.hideTimerId);
+}
+
+function scheduleIntroDismiss(durationSeconds) {
+  clearTimeout(introState.timeoutId);
+  introState.timeoutId = setTimeout(finishIntro, getIntroTimeoutMs(durationSeconds, INTRO_FALLBACK_MS));
+}
+
+function hideIntroOverlay() {
+  if (!introEls.overlay || introEls.overlay.hidden) return;
+
+  clearIntroTimers();
+  introEls.overlay.classList.add('is-hiding');
+
+  try {
+    introEls.video?.pause();
+  } catch (_) { /* ignore */ }
+
+  introState.hideTimerId = setTimeout(() => {
+    if (!introEls.overlay) return;
+    introEls.overlay.hidden = true;
+    introEls.overlay.classList.remove('is-hiding');
+  }, 360);
+}
+
+function finishIntro() {
+  introState.playing = false;
+  const afterFinish = introState.afterFinish;
+  introState.afterFinish = null;
+  hideIntroOverlay();
+  if (afterFinish) afterFinish();
+}
+
+function wireIntroEvents() {
+  if (introState.wired || !introEls.overlay || !introEls.video) return;
+  introState.wired = true;
+
+  introEls.skip?.addEventListener('click', finishIntro);
+  introEls.video.addEventListener('ended', finishIntro);
+  introEls.video.addEventListener('error', finishIntro);
+  introEls.video.addEventListener('loadedmetadata', () => {
+    if (!introState.playing) return;
+    scheduleIntroDismiss(introEls.video.duration);
+  });
+}
+
+function playIntro(afterFinish) {
+  if (!introEls.overlay || !introEls.video) {
+    if (afterFinish) afterFinish();
+    return;
+  }
+
+  wireIntroEvents();
+  clearIntroTimers();
+  introState.afterFinish = afterFinish || null;
+  introState.playing = true;
+  markIntroSeen();
+
+  introEls.overlay.hidden = false;
+  introEls.overlay.classList.remove('is-hiding');
+
+  try {
+    introEls.video.pause();
+    introEls.video.currentTime = 0;
+  } catch (_) { /* ignore */ }
+
+  scheduleIntroDismiss(introEls.video.duration);
+
+  const playAttempt = introEls.video.play();
+  if (playAttempt && typeof playAttempt.catch === 'function') {
+    playAttempt.catch(() => finishIntro());
+  }
+}
+
+function initIntro() {
+  if (!introEls.overlay || !introEls.video) return;
+  wireIntroEvents();
+  introEls.overlay.hidden = true;
+}
+
+function startFromLanding() {
+  if (introState.playing) return;
+
+  preloadBirdCalls();
+
+  const shouldPlayIntro = shouldShowIntro({
+    startRequested: true,
+    hasSeenIntro: hasSeenIntro(),
+    prefersReducedMotion: prefersReducedMotion(),
+  });
+
+  if (!shouldPlayIntro) {
+    showScreen('difficulty');
+    return;
+  }
+
+  playIntro(() => showScreen('difficulty'));
 }
 
 function getDifficultyLabel(level) {
@@ -1146,6 +1288,7 @@ function beginPlay() {
 function init() {
   buildBirdButtons();
   resetLeaderboardRoundState();
+  initIntro();
 
   if (leaderboardEls.submitName) {
     leaderboardEls.submitName.maxLength = MAX_LEADERBOARD_NAME_LENGTH;
@@ -1155,10 +1298,7 @@ function init() {
     });
   }
 
-  $('#btn-start').addEventListener('click', () => {
-    preloadBirdCalls();
-    showScreen('difficulty');
-  });
+  $('#btn-start').addEventListener('click', startFromLanding);
   $('#btn-back-start').addEventListener('click', () => showScreen('start'));
   $('#btn-quit').addEventListener('click', quitToHome);
   $('#btn-replay').addEventListener('click', () => startGame(state.level));

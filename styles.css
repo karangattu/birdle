@@ -15,6 +15,102 @@ html, body, #app {
 
 button { font-family: inherit; cursor: pointer; border: none; }
 
+/* ---------- Intro ---------- */
+.intro-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(3, 8, 3, 0.12) 0%, rgba(3, 8, 3, 0.5) 100%),
+    #000 url('assets/Birdle%20game%20poster.jpg') center / cover no-repeat;
+  opacity: 1;
+  transition: opacity .36s ease, visibility .36s ease;
+}
+
+.intro-overlay[hidden] {
+  display: none;
+}
+
+.intro-overlay.is-hiding {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.intro-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
+}
+
+.intro-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.48) 100%);
+  pointer-events: none;
+}
+
+.intro-chrome {
+  position: relative;
+  z-index: 1;
+  width: min(860px, 100%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.intro-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.intro-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.52);
+  border: 1px solid rgba(255,255,255,0.14);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.intro-note {
+  max-width: 340px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.84);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.45);
+}
+
+.intro-skip {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+}
+
+.intro-skip:hover {
+  background: rgba(255,255,255,0.18);
+}
+
 /* ---------- Screens ---------- */
 .screen {
   position: absolute;
@@ -766,6 +862,19 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 /* Small screens: shrink bird buttons grid into 2 rows */
 @media (max-width: 520px) {
+  .intro-overlay {
+    padding: 16px;
+  }
+  .intro-chrome {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .intro-note {
+    max-width: none;
+  }
+  .intro-skip {
+    width: 100%;
+  }
   #bird-buttons {
     grid-template-columns: repeat(5, 1fr);
     gap: 4px;
