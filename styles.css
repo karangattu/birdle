@@ -154,13 +154,16 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .start-overlay {
   position: absolute;
-  bottom: 6%;
+  top: 0;
+  bottom: max(18px, env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   gap: 14px;
+  padding: clamp(220px, 38vh, 320px) 16px 0;
   z-index: 2;
 }
 .start-overlay .hint {
@@ -933,8 +936,10 @@ button { font-family: inherit; cursor: pointer; border: none; }
     border-radius: 14px;
   }
   .start-overlay {
+    top: 0;
     bottom: max(8px, env(safe-area-inset-bottom));
     gap: 8px;
+    padding-top: clamp(92px, 22vh, 132px);
   }
   .start-overlay .hint {
     max-width: calc(100vw - 32px);
