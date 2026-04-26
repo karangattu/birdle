@@ -32,7 +32,6 @@ const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
 const LEADERBOARD_TABLE = 'birdle_leaderboad';
 const LEADERBOARD_NAME_KEY = 'birdle_leaderboard_name';
-const INTRO_SESSION_KEY = 'birdle_intro_seen';
 const INTRO_FALLBACK_MS = 2600;
 const SUPABASE_URL = 'https://ovwktjjeoowlktdfbuuu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU';
@@ -108,8 +107,7 @@ const introEls = {
   skip: $('#btn-skip-intro'),
 };
 const leaderboardEls = {
-  startList: $('#leaderboard-start-list'),
-  startStatus: $('#leaderboard-start-status'),
+  startHigh: $('#leaderboard-start-high'),
   endList: $('#leaderboard-end-list'),
   endStatus: $('#leaderboard-end-status'),
   submitCard: $('#leaderboard-submit'),
@@ -177,20 +175,6 @@ function prefersReducedMotion() {
   }
 }
 
-function hasSeenIntro() {
-  try {
-    return sessionStorage.getItem(INTRO_SESSION_KEY) === '1';
-  } catch (_) {
-    return false;
-  }
-}
-
-function markIntroSeen() {
-  try {
-    sessionStorage.setItem(INTRO_SESSION_KEY, '1');
-  } catch (_) { /* ignore */ }
-}
-
 function clearIntroTimers() {
   clearTimeout(introState.timeoutId);
   clearTimeout(introState.hideTimerId);
@@ -249,7 +233,6 @@ function playIntro(afterFinish) {
   clearIntroTimers();
   introState.afterFinish = afterFinish || null;
   introState.playing = true;
-  markIntroSeen();
 
   introEls.overlay.hidden = false;
   introEls.overlay.classList.remove('is-hiding');
@@ -286,7 +269,6 @@ function startFromLanding() {
 
   const shouldPlayIntro = shouldShowIntro({
     startRequested: true,
-    hasSeenIntro: hasSeenIntro(),
     prefersReducedMotion: prefersReducedMotion(),
   });
 
@@ -434,8 +416,25 @@ function renderLeaderboardList(listEl, statusEl) {
   }
 }
 
+function startLeaderboardHighText() {
+  const topEntry = sortLeaderboardEntries(leaderboardState.entries)[0];
+  if (topEntry) {
+    const playerName = topEntry.player_name || 'Player';
+    return `Global leaderboard high score: ${topEntry.score} by ${playerName}`;
+  }
+
+  if (leaderboardState.phase === 'loading') return 'Global leaderboard high score: loading...';
+  if (leaderboardState.phase === 'disabled' || leaderboardState.phase === 'error') {
+    return 'Global leaderboard high score unavailable right now.';
+  }
+
+  return 'Global leaderboard high score: no scores submitted yet.';
+}
+
 function renderLeaderboardLists() {
-  renderLeaderboardList(leaderboardEls.startList, leaderboardEls.startStatus);
+  if (leaderboardEls.startHigh) {
+    leaderboardEls.startHigh.textContent = startLeaderboardHighText();
+  }
   renderLeaderboardList(leaderboardEls.endList, leaderboardEls.endStatus);
 }
 

@@ -185,6 +185,16 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 .start-bests:empty { display: none; }
 
+.start-leaderboard-high {
+  max-width: min(520px, calc(100vw - 32px));
+  min-height: 1em;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255,255,255,0.78);
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+
 .leaderboard-card {
   width: min(420px, calc(100vw - 32px));
   background: rgba(8,16,8,0.74);

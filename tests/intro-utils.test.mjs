@@ -13,7 +13,7 @@ test('intro stays hidden until start is requested', async () => {
   const { shouldShowIntro } = await loadHelpers();
 
   assert.equal(
-    shouldShowIntro({ startRequested: false, hasSeenIntro: false, prefersReducedMotion: false }),
+    shouldShowIntro({ startRequested: false, prefersReducedMotion: false }),
     false
   );
 });
@@ -22,17 +22,17 @@ test('intro shows after start is requested when motion is allowed', async () => 
   const { shouldShowIntro } = await loadHelpers();
 
   assert.equal(
-    shouldShowIntro({ startRequested: true, hasSeenIntro: false, prefersReducedMotion: false }),
+    shouldShowIntro({ startRequested: true, prefersReducedMotion: false }),
     true
   );
 });
 
-test('intro skips after the session has already seen it', async () => {
+test('intro still shows on later start requests in the same session', async () => {
   const { shouldShowIntro } = await loadHelpers();
 
   assert.equal(
-    shouldShowIntro({ startRequested: true, hasSeenIntro: true, prefersReducedMotion: false }),
-    false
+    shouldShowIntro({ startRequested: true, prefersReducedMotion: false }),
+    true
   );
 });
 
@@ -40,7 +40,7 @@ test('intro skips when reduced motion is preferred', async () => {
   const { shouldShowIntro } = await loadHelpers();
 
   assert.equal(
-    shouldShowIntro({ startRequested: true, hasSeenIntro: false, prefersReducedMotion: true }),
+    shouldShowIntro({ startRequested: true, prefersReducedMotion: true }),
     false
   );
 });

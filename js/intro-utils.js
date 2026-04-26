@@ -1,5 +1,5 @@
-export function shouldShowIntro({ startRequested = false, hasSeenIntro = false, prefersReducedMotion = false } = {}) {
-  return startRequested && !hasSeenIntro && !prefersReducedMotion;
+export function shouldShowIntro({ startRequested = false, prefersReducedMotion = false } = {}) {
+  return startRequested && !prefersReducedMotion;
 }
 
 export function getIntroTimeoutMs(durationSeconds, fallbackMs = 2600, bufferMs = 500) {
