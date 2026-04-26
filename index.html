@@ -24,6 +24,18 @@
         <button id="btn-start" class="big-btn">Start Game</button>
         <p class="hint">Spot the birds. Tap the matching button. Don't get fooled.</p>
         <p id="start-bests" class="start-bests"></p>
+        <section class="leaderboard-card leaderboard-card-start" aria-labelledby="leaderboard-start-title">
+          <div class="leaderboard-heading">
+            <span class="leaderboard-heading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+            </span>
+            <div>
+              <h2 id="leaderboard-start-title">Global Top 5</h2>
+              <p id="leaderboard-start-status" class="leaderboard-status">Loading global high scores...</p>
+            </div>
+          </div>
+          <ol id="leaderboard-start-list" class="leaderboard-list" aria-live="polite"></ol>
+        </section>
         <div class="start-footer">
           <button id="btn-reset-scores" class="link-btn">Reset best scores</button>
         </div>
@@ -157,6 +169,37 @@
           Misses: <span id="misses">0</span>
         </p>
         <p id="best-record" class="best"></p>
+        <section id="leaderboard-submit" class="leaderboard-submit" hidden aria-live="polite">
+          <div class="leaderboard-submit-copy">
+            <div class="leaderboard-submit-title">Global Leaderboard</div>
+            <p id="leaderboard-submit-message" class="leaderboard-submit-message"></p>
+          </div>
+          <div id="leaderboard-submit-buttons" class="leaderboard-submit-buttons">
+            <button id="btn-submit-score" class="big-btn big-btn-small" type="button">Submit Score</button>
+            <button id="btn-skip-score" class="link-btn" type="button">Skip</button>
+          </div>
+          <form id="leaderboard-form" class="leaderboard-form" hidden>
+            <label for="leaderboard-name">Name</label>
+            <div class="leaderboard-form-row">
+              <input id="leaderboard-name" name="leaderboard-name" type="text" maxlength="24" autocomplete="nickname" placeholder="Enter your name" />
+              <button id="btn-save-score" class="big-btn big-btn-small" type="submit">Save</button>
+            </div>
+            <button id="btn-cancel-submit" class="link-btn" type="button">Never mind</button>
+            <p id="leaderboard-submit-feedback" class="leaderboard-submit-feedback"></p>
+          </form>
+        </section>
+        <section class="leaderboard-card leaderboard-card-end" aria-labelledby="leaderboard-end-title">
+          <div class="leaderboard-heading">
+            <span class="leaderboard-heading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+            </span>
+            <div>
+              <h2 id="leaderboard-end-title">Global Top 5</h2>
+              <p id="leaderboard-end-status" class="leaderboard-status">Loading global high scores...</p>
+            </div>
+          </div>
+          <ol id="leaderboard-end-list" class="leaderboard-list" aria-live="polite"></ol>
+        </section>
         <div class="end-buttons">
           <button id="btn-replay" class="big-btn">Play Again</button>
           <button id="btn-home" class="link-btn">Home</button>
@@ -185,6 +228,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/game.js" type="module"></script>
 </body>
 </html>

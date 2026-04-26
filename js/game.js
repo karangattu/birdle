@@ -1,3 +1,11 @@
+import {
+  LEADERBOARD_LIMIT,
+  MAX_LEADERBOARD_NAME_LENGTH,
+  scoreQualifies,
+  sortLeaderboardEntries,
+  validateLeaderboardName,
+} from './leaderboard-utils.js';
+
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
 
@@ -17,6 +25,32 @@ const BIRDS = [
 const BIRD_CALL_VOLUME = 0.42;
 const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
+const LEADERBOARD_TABLE = 'birdle_leaderboad';
+const LEADERBOARD_NAME_KEY = 'birdle_leaderboard_name';
+const SUPABASE_URL = 'https://ovwktjjeoowlktdfbuuu.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU';
+const LEADERBOARD_BADGE_ICONS = {
+  regular: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10h4"/><path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/><path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/><path d="M5 7h14"/><path d="M19 7c1.5 2.5 2 5 2 7.5a4.5 4.5 0 1 1-9 0v-1a2 2 0 0 0-4 0v1a4.5 4.5 0 1 1-9 0C-1 12 -.5 9.5 1 7" transform="translate(2 0)"/></svg>',
+  expert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+};
+
+function createSupabaseClient() {
+  if (!window.supabase?.createClient || !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) return null;
+
+  try {
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
+const supabaseClient = createSupabaseClient();
 
 const DIFFICULTY = {
   regular: {
@@ -61,6 +95,22 @@ const buttonsEl  = $('#bird-buttons');
 const scoreEl    = $('#score');
 const comboEl    = $('#combo');
 const timeEl     = $('#time');
+const leaderboardEls = {
+  startList: $('#leaderboard-start-list'),
+  startStatus: $('#leaderboard-start-status'),
+  endList: $('#leaderboard-end-list'),
+  endStatus: $('#leaderboard-end-status'),
+  submitCard: $('#leaderboard-submit'),
+  submitButtons: $('#leaderboard-submit-buttons'),
+  submitMessage: $('#leaderboard-submit-message'),
+  submitForm: $('#leaderboard-form'),
+  submitName: $('#leaderboard-name'),
+  submitFeedback: $('#leaderboard-submit-feedback'),
+  submitAction: $('#btn-submit-score'),
+  skipAction: $('#btn-skip-score'),
+  saveAction: $('#btn-save-score'),
+  cancelAction: $('#btn-cancel-submit'),
+};
 
 // ---------- State ----------
 const state = {
@@ -79,12 +129,345 @@ const state = {
   running: false,
 };
 
+const leaderboardState = {
+  entries: [],
+  phase: supabaseClient ? 'idle' : 'disabled',
+  errorMessage: '',
+  fetchPromise: null,
+  submitting: false,
+  formVisible: false,
+  submittedThisGame: false,
+  skippedThisGame: false,
+  lastSubmittedName: '',
+};
+
 let nextBirdId = 1;
 
 // ---------- Screen control ----------
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+}
+
+function getDifficultyLabel(level) {
+  return level === 'expert' ? 'Expert' : 'Regular';
+}
+
+function formatLeaderboardDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown date';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getStoredLeaderboardName() {
+  try {
+    return localStorage.getItem(LEADERBOARD_NAME_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function storeLeaderboardName(name) {
+  try {
+    localStorage.setItem(LEADERBOARD_NAME_KEY, name);
+  } catch (_) { /* ignore */ }
+}
+
+function setLeaderboardControlsDisabled(disabled) {
+  ['submitAction', 'skipAction', 'saveAction', 'cancelAction', 'submitName'].forEach((key) => {
+    const el = leaderboardEls[key];
+    if (el) el.disabled = disabled;
+  });
+}
+
+function setSubmitFeedback(message = '', tone = '') {
+  const el = leaderboardEls.submitFeedback;
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('info', 'success', 'error');
+  if (tone) el.classList.add(tone);
+}
+
+function resetLeaderboardRoundState() {
+  leaderboardState.submitting = false;
+  leaderboardState.formVisible = false;
+  leaderboardState.submittedThisGame = false;
+  leaderboardState.skippedThisGame = false;
+  leaderboardState.lastSubmittedName = '';
+  setLeaderboardControlsDisabled(false);
+  setSubmitFeedback('');
+  if (leaderboardEls.submitName) leaderboardEls.submitName.value = getStoredLeaderboardName();
+  if (leaderboardEls.submitCard) leaderboardEls.submitCard.hidden = true;
+  if (leaderboardEls.submitButtons) leaderboardEls.submitButtons.hidden = false;
+  if (leaderboardEls.submitForm) leaderboardEls.submitForm.hidden = true;
+}
+
+function createDifficultyBadge(level) {
+  const badge = document.createElement('span');
+  const kind = level === 'expert' ? 'expert' : 'regular';
+  badge.className = `leaderboard-badge ${kind}`;
+
+  const icon = document.createElement('span');
+  icon.className = 'leaderboard-badge-icon';
+  icon.innerHTML = LEADERBOARD_BADGE_ICONS[kind];
+
+  const label = document.createElement('span');
+  label.textContent = getDifficultyLabel(kind);
+
+  badge.append(icon, label);
+  return badge;
+}
+
+function createLeaderboardItem(entry, index) {
+  const item = document.createElement('li');
+  item.className = 'leaderboard-entry';
+
+  const rank = document.createElement('div');
+  rank.className = 'leaderboard-rank' + (index < 3 ? ` leaderboard-rank-${index + 1}` : '');
+  rank.textContent = String(index + 1);
+
+  const main = document.createElement('div');
+  main.className = 'leaderboard-entry-main';
+
+  const name = document.createElement('div');
+  name.className = 'leaderboard-entry-name';
+  name.textContent = entry.player_name || 'Player';
+
+  const meta = document.createElement('div');
+  meta.className = 'leaderboard-entry-meta';
+  meta.append(createDifficultyBadge(entry.difficulty));
+
+  const date = document.createElement('span');
+  date.className = 'leaderboard-entry-date';
+  date.textContent = formatLeaderboardDate(entry.created_at);
+  meta.append(date);
+
+  main.append(name, meta);
+
+  const score = document.createElement('div');
+  score.className = 'leaderboard-entry-score';
+  score.textContent = String(entry.score || 0);
+
+  item.append(rank, main, score);
+  return item;
+}
+
+function leaderboardUnavailableMessage() {
+  if (leaderboardState.errorMessage.includes('Could not find the table')) {
+    return 'Run the Supabase leaderboard SQL setup to enable global scores.';
+  }
+  return 'Global leaderboard unavailable right now.';
+}
+
+function leaderboardStatusText() {
+  if (leaderboardState.phase === 'disabled') return 'Global leaderboard is unavailable right now.';
+  if (leaderboardState.phase === 'loading') {
+    return leaderboardState.entries.length ? 'Refreshing global high scores...' : 'Loading global high scores...';
+  }
+  if (leaderboardState.phase === 'error') {
+    return leaderboardState.entries.length
+      ? 'Showing the last loaded scores.'
+      : leaderboardUnavailableMessage();
+  }
+  if (leaderboardState.entries.length === 0) return 'No scores submitted yet.';
+  return 'Top 5 high scores';
+}
+
+function renderLeaderboardList(listEl, statusEl) {
+  if (!listEl || !statusEl) return;
+
+  statusEl.textContent = leaderboardStatusText();
+  listEl.textContent = '';
+
+  const entries = sortLeaderboardEntries(leaderboardState.entries).slice(0, LEADERBOARD_LIMIT);
+  for (const [index, entry] of entries.entries()) {
+    listEl.appendChild(createLeaderboardItem(entry, index));
+  }
+}
+
+function renderLeaderboardLists() {
+  renderLeaderboardList(leaderboardEls.startList, leaderboardEls.startStatus);
+  renderLeaderboardList(leaderboardEls.endList, leaderboardEls.endStatus);
+}
+
+function syncLeaderboardSubmitCard() {
+  const card = leaderboardEls.submitCard;
+  if (!card) return;
+
+  if (leaderboardState.phase === 'disabled') {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = 'Global score submission is unavailable right now.';
+    return;
+  }
+
+  if (leaderboardState.submittedThisGame) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = `Score submitted as ${leaderboardState.lastSubmittedName}.`;
+    setSubmitFeedback('Saved to the live leaderboard.', 'success');
+    return;
+  }
+
+  if (leaderboardState.phase === 'loading' && leaderboardState.entries.length === 0) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = 'Checking whether this run made the global top 5...';
+    return;
+  }
+
+  if (leaderboardState.phase === 'error' && leaderboardState.entries.length === 0) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = leaderboardUnavailableMessage();
+    return;
+  }
+
+  const qualifies = scoreQualifies(state.score, leaderboardState.entries, LEADERBOARD_LIMIT);
+  const cutoff = leaderboardState.entries.length >= LEADERBOARD_LIMIT
+    ? leaderboardState.entries[LEADERBOARD_LIMIT - 1].score
+    : null;
+
+  if (!qualifies) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = cutoff === null
+      ? 'Global score submission opens once the leaderboard is available.'
+      : `Beat ${cutoff} to reach the global top ${LEADERBOARD_LIMIT}.`;
+    if (!leaderboardState.submitting) setSubmitFeedback('');
+    return;
+  }
+
+  if (leaderboardState.skippedThisGame) {
+    card.hidden = true;
+    if (!leaderboardState.submitting) setSubmitFeedback('');
+    return;
+  }
+
+  card.hidden = false;
+  leaderboardEls.submitMessage.textContent = leaderboardState.entries.length < LEADERBOARD_LIMIT
+    ? 'You opened a new spot on the global leaderboard. Submit your score?'
+    : `You cracked the global top ${LEADERBOARD_LIMIT}. Submit your score?`;
+  leaderboardEls.submitButtons.hidden = leaderboardState.formVisible;
+  leaderboardEls.submitForm.hidden = !leaderboardState.formVisible;
+  if (!leaderboardState.formVisible && !leaderboardState.submitting) setSubmitFeedback('');
+}
+
+async function loadGlobalLeaderboard(force = false) {
+  if (!supabaseClient) {
+    leaderboardState.phase = 'disabled';
+    renderLeaderboardLists();
+    syncLeaderboardSubmitCard();
+    return [];
+  }
+
+  if (leaderboardState.fetchPromise && !force) return leaderboardState.fetchPromise;
+
+  leaderboardState.phase = 'loading';
+  leaderboardState.errorMessage = '';
+  renderLeaderboardLists();
+  syncLeaderboardSubmitCard();
+
+  leaderboardState.fetchPromise = supabaseClient
+    .from(LEADERBOARD_TABLE)
+    .select('id, player_name, score, difficulty, created_at')
+    .order('score', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(LEADERBOARD_LIMIT)
+    .then(({ data, error }) => {
+      if (error) throw error;
+      leaderboardState.entries = sortLeaderboardEntries(data || []).slice(0, LEADERBOARD_LIMIT);
+      leaderboardState.phase = 'ready';
+      return leaderboardState.entries;
+    })
+    .catch((error) => {
+      leaderboardState.phase = 'error';
+      leaderboardState.errorMessage = error?.message || 'Global leaderboard unavailable right now.';
+      return leaderboardState.entries;
+    })
+    .finally(() => {
+      leaderboardState.fetchPromise = null;
+      renderLeaderboardLists();
+      syncLeaderboardSubmitCard();
+    });
+
+  return leaderboardState.fetchPromise;
+}
+
+function openLeaderboardForm() {
+  if (leaderboardState.submitting) return;
+  leaderboardState.formVisible = true;
+  leaderboardState.skippedThisGame = false;
+  syncLeaderboardSubmitCard();
+  setSubmitFeedback('');
+  if (leaderboardEls.submitName) {
+    leaderboardEls.submitName.focus();
+    leaderboardEls.submitName.select();
+  }
+}
+
+function closeLeaderboardForm() {
+  if (leaderboardState.submitting) return;
+  leaderboardState.formVisible = false;
+  syncLeaderboardSubmitCard();
+  setSubmitFeedback('');
+}
+
+function skipLeaderboardSubmission() {
+  if (leaderboardState.submitting) return;
+  leaderboardState.formVisible = false;
+  leaderboardState.skippedThisGame = true;
+  syncLeaderboardSubmitCard();
+  setSubmitFeedback('');
+}
+
+async function submitLeaderboardScore(event) {
+  event.preventDefault();
+  if (leaderboardState.submitting || !supabaseClient) return;
+
+  const validation = validateLeaderboardName(leaderboardEls.submitName.value);
+  if (!validation.ok) {
+    setSubmitFeedback(validation.message, 'error');
+    return;
+  }
+
+  leaderboardState.submitting = true;
+  setLeaderboardControlsDisabled(true);
+  setSubmitFeedback('Saving score...', 'info');
+
+  try {
+    const { error } = await supabaseClient.from(LEADERBOARD_TABLE).insert({
+      player_name: validation.value,
+      score: state.score,
+      difficulty: state.level,
+      best_combo: state.bestCombo,
+      hits: state.hits,
+      misses: state.misses,
+    });
+
+    if (error) throw error;
+
+    storeLeaderboardName(validation.value);
+    leaderboardState.lastSubmittedName = validation.value;
+    leaderboardState.submittedThisGame = true;
+    leaderboardState.skippedThisGame = false;
+    leaderboardState.formVisible = false;
+    await loadGlobalLeaderboard(true);
+  } catch (error) {
+    setSubmitFeedback(
+      error?.message ? `Could not submit score: ${error.message}` : 'Could not submit score right now.',
+      'error'
+    );
+  } finally {
+    leaderboardState.submitting = false;
+    setLeaderboardControlsDisabled(false);
+    syncLeaderboardSubmitCard();
+  }
 }
 
 // ---------- Bird buttons ----------
@@ -433,6 +816,7 @@ function startGame(level) {
   popupLayer.innerHTML = '';
   state.active.clear();
   state.recentlyExpired = [];
+  resetLeaderboardRoundState();
 
   updateHUD();
   showScreen('game');
@@ -501,6 +885,8 @@ function endGame() {
 
   refreshBestPreview();
   showScreen('end');
+  syncLeaderboardSubmitCard();
+  void loadGlobalLeaderboard(true);
 }
 
 function quitToHome() {
@@ -759,6 +1145,15 @@ function beginPlay() {
 // ---------- Wire up ----------
 function init() {
   buildBirdButtons();
+  resetLeaderboardRoundState();
+
+  if (leaderboardEls.submitName) {
+    leaderboardEls.submitName.maxLength = MAX_LEADERBOARD_NAME_LENGTH;
+    leaderboardEls.submitName.value = getStoredLeaderboardName();
+    leaderboardEls.submitName.addEventListener('input', () => {
+      if (!leaderboardState.submitting) setSubmitFeedback('');
+    });
+  }
 
   $('#btn-start').addEventListener('click', () => {
     preloadBirdCalls();
@@ -781,8 +1176,14 @@ function init() {
 
   $('#btn-training-skip').addEventListener('click', skipTraining);
   $('#btn-reset-scores').addEventListener('click', resetBestScores);
+  leaderboardEls.submitAction?.addEventListener('click', openLeaderboardForm);
+  leaderboardEls.skipAction?.addEventListener('click', skipLeaderboardSubmission);
+  leaderboardEls.cancelAction?.addEventListener('click', closeLeaderboardForm);
+  leaderboardEls.submitForm?.addEventListener('submit', submitLeaderboardScore);
 
   refreshBestPreview();
+  renderLeaderboardLists();
+  void loadGlobalLeaderboard();
 
   // Register service worker for offline play
   if ('serviceWorker' in navigator) {
