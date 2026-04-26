@@ -13,6 +13,17 @@ html, body, #app {
   -webkit-tap-highlight-color: transparent;
 }
 
+#app {
+  position: relative;
+  height: 100dvh;
+}
+
+#app:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  background: #0d1a0d;
+}
+
 button { font-family: inherit; cursor: pointer; border: none; }
 
 /* ---------- Intro ---------- */
@@ -767,7 +778,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
-  padding: 0 8px;
+  padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   z-index: 6;
 }
 .bird-btn {
@@ -915,6 +926,63 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .org-logo {
+    top: 8px;
+    height: clamp(64px, 18vh, 96px);
+    padding: 7px 14px;
+    border-radius: 14px;
+  }
+  .start-overlay {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .start-overlay .hint {
+    max-width: calc(100vw - 32px);
+    padding: 5px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .start-overlay .big-btn {
+    font-size: 18px;
+    padding: 10px 28px;
+  }
+  .leaderboard-card-start {
+    width: min(480px, calc(100vw - 32px));
+    max-height: min(162px, 42vh);
+    padding: 10px 12px;
+  }
+  .leaderboard-card-start .leaderboard-heading-icon {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .leaderboard-card-start .leaderboard-heading h2 {
+    font-size: 16px;
+  }
+  .leaderboard-card-start .leaderboard-status {
+    font-size: 11px;
+  }
+  .leaderboard-card-start .leaderboard-list {
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .leaderboard-card-start .leaderboard-entry {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    padding: 7px 10px;
+  }
+  .leaderboard-card-start .leaderboard-rank {
+    width: 32px;
+    height: 32px;
+  }
+  .leaderboard-card-start .leaderboard-entry-score {
+    font-size: 20px;
+  }
+  .start-footer {
+    padding: 4px 12px;
+  }
   #bird-buttons { grid-template-columns: repeat(10, 1fr); }
   .bird-btn img { display: none; }
   .bird-btn { min-height: 40px; font-size: 11px; padding: 6px 4px; }

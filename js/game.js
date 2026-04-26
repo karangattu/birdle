@@ -9,6 +9,7 @@ import {
   getIntroTimeoutMs,
   shouldShowIntro,
 } from './intro-utils.js';
+import { requestAppFullscreen } from './fullscreen-utils.js';
 
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
@@ -274,6 +275,12 @@ function initIntro() {
 
 function startFromLanding() {
   if (introState.playing) return;
+
+  void requestAppFullscreen({
+    target: $('#app') || document.documentElement,
+    doc: document,
+    orientation: window.screen?.orientation,
+  });
 
   preloadBirdCalls();
 
