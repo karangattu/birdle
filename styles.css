@@ -1051,6 +1051,107 @@ button { font-family: inherit; cursor: pointer; border: none; }
 #screen-game.countdown #bird-buttons { opacity: 0; pointer-events: none; }
 #bird-buttons { transition: opacity .3s ease; }
 
+/* ---------- Audio tooltip ---------- */
+.audio-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: max(86px, calc(env(safe-area-inset-bottom) + 78px));
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 8px 13px 8px 8px;
+  border: 1px solid rgba(255,216,74,0.42);
+  border-radius: 999px;
+  background: rgba(8,16,8,0.84);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: left;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.38);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+  animation: audioTooltipIn .22s ease both;
+}
+.audio-tooltip[hidden] { display: none; }
+.audio-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 26px;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(255,216,74,0.42);
+  border-bottom: 1px solid rgba(255,216,74,0.42);
+  background: rgba(8,16,8,0.84);
+  transform: rotate(45deg);
+}
+.audio-tooltip:hover,
+.audio-tooltip:focus-visible {
+  outline: none;
+  border-color: rgba(255,216,74,0.72);
+  background: rgba(14,26,14,0.92);
+}
+.audio-tooltip-icon {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg,#ffd84a,#ffae00);
+  color: #2a1a00;
+  box-shadow: 0 3px 0 #8a5a00;
+}
+.audio-tooltip-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.audio-tooltip-message {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.audio-tooltip.is-alert {
+  border-color: rgba(255,138,138,0.58);
+}
+.audio-tooltip.is-alert::after {
+  border-color: rgba(255,138,138,0.58);
+}
+.audio-tooltip.is-alert .audio-tooltip-icon {
+  background: linear-gradient(180deg,#ffcf6a,#ff8a3d);
+  box-shadow: 0 3px 0 #8a4216;
+}
+@keyframes audioTooltipIn {
+  from { opacity: 0; transform: translate(-50%, 8px) scale(0.98); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .audio-tooltip {
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 54px));
+    max-width: min(340px, calc(100vw - 24px));
+    padding: 7px 11px 7px 7px;
+    font-size: 12px;
+  }
+  .audio-tooltip-icon {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
+  }
+  .audio-tooltip-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 /* ---------- Rotate-device overlay (portrait phones/tablets only) ---------- */
 #rotate-overlay {
   position: fixed;

@@ -10,6 +10,11 @@ import {
   shouldShowIntro,
 } from './intro-utils.js';
 import { requestAppFullscreen } from './fullscreen-utils.js';
+import {
+  AUDIO_STATUS,
+  audioStatusMessage,
+  getMediaAudioStatus,
+} from './audio-utils.js';
 
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
@@ -27,7 +32,10 @@ const BIRDS = [
   { id: 'spotted_towhee',    name: 'Spotted Towhee',    img: 'assets/spotted_towhee.png',    sound: 'assets/spotted_towhee.mp3' },
 ];
 
-const BIRD_CALL_VOLUME = 0.42;
+const BIRD_CALL_VOLUME = 0.72;
+const BEEP_VOLUME = 0.08;
+const AUDIO_TIP_HIDE_MS = 5200;
+const AUDIO_REMINDER_HIDE_MS = 4200;
 const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
 const LEADERBOARD_TABLE = 'birdle_leaderboad';
@@ -121,6 +129,10 @@ const leaderboardEls = {
   saveAction: $('#btn-save-score'),
   cancelAction: $('#btn-cancel-submit'),
 };
+const audioTipEls = {
+  tooltip: $('#audio-tooltip'),
+  message: $('#audio-tooltip-message'),
+};
 
 // ---------- State ----------
 const state = {
@@ -157,6 +169,11 @@ const introState = {
   afterFinish: null,
   playing: false,
   wired: false,
+};
+
+const audioTipState = {
+  hideTimer: 0,
+  reminderShown: false,
 };
 
 let nextBirdId = 1;
@@ -266,6 +283,7 @@ function startFromLanding() {
   });
 
   preloadBirdCalls();
+  void resumeAudioContextForGame({ reportBlocked: false });
 
   const shouldPlayIntro = shouldShowIntro({
     startRequested: true,
@@ -859,6 +877,46 @@ function vibrate(pattern) {
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (_) {}
 }
 
+function hideAudioTooltip() {
+  clearTimeout(audioTipState.hideTimer);
+  audioTipState.hideTimer = 0;
+  if (audioTipEls.tooltip) audioTipEls.tooltip.hidden = true;
+}
+
+function showAudioTooltip(status, { durationMs = AUDIO_TIP_HIDE_MS } = {}) {
+  const message = audioStatusMessage(status);
+  if (!audioTipEls.tooltip || !audioTipEls.message || !message) return;
+
+  audioTipEls.message.textContent = message;
+  audioTipEls.tooltip.title = message;
+  audioTipEls.tooltip.hidden = false;
+  audioTipEls.tooltip.classList.toggle('is-alert', status !== AUDIO_STATUS.RECOMMENDED);
+
+  clearTimeout(audioTipState.hideTimer);
+  audioTipState.hideTimer = 0;
+  if (durationMs > 0) {
+    audioTipState.hideTimer = setTimeout(hideAudioTooltip, durationMs);
+  }
+}
+
+function reportAudioStatus(status, options = {}) {
+  if (status === AUDIO_STATUS.OK) {
+    hideAudioTooltip();
+    return;
+  }
+
+  const shouldPersist = status === AUDIO_STATUS.BLOCKED || status === AUDIO_STATUS.UNSUPPORTED;
+  showAudioTooltip(status, {
+    durationMs: options.durationMs ?? (shouldPersist ? 0 : AUDIO_TIP_HIDE_MS),
+  });
+}
+
+function remindForAudioExperience() {
+  if (audioTipState.reminderShown) return;
+  audioTipState.reminderShown = true;
+  showAudioTooltip(AUDIO_STATUS.RECOMMENDED, { durationMs: AUDIO_REMINDER_HIDE_MS });
+}
+
 // ---------- Ranks ----------
 // Every player gets a fun, encouraging title — no zeros, no losers.
 // Ranks are tiered by score, scaled per difficulty so Expert and Regular
@@ -951,6 +1009,7 @@ function startTicker() {
 // ---------- Lifecycle ----------
 function startGame(level) {
   stopAllBirdCalls();
+  void resumeAudioContextForGame({ reportBlocked: false });
   state.level = level;
   state.score = 0;
   state.combo = 1;
@@ -1051,24 +1110,106 @@ function quitToHome() {
 
 // ---------- Tiny sound (Web Audio) ----------
 let audioCtx = null;
+function getAudioContext() {
+  if (audioCtx) return audioCtx;
+
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    reportAudioStatus(AUDIO_STATUS.UNSUPPORTED);
+    return null;
+  }
+
+  audioCtx = new AudioContextCtor();
+  return audioCtx;
+}
+
+async function resumeAudioContextForGame({ reportBlocked = true } = {}) {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return false;
+
+    if (ctx.state === 'running') {
+      if (audioTipEls.tooltip?.classList.contains('is-alert')) hideAudioTooltip();
+      return true;
+    }
+
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+      if (ctx.state === 'running') {
+        if (audioTipEls.tooltip?.classList.contains('is-alert')) hideAudioTooltip();
+        return true;
+      }
+    }
+
+    if (reportBlocked) reportAudioStatus(AUDIO_STATUS.BLOCKED);
+  } catch (_) {
+    if (reportBlocked) reportAudioStatus(AUDIO_STATUS.BLOCKED);
+  }
+  return false;
+}
+
+function playTone(ctx, freq, dur) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = 'sine';
+  o.frequency.value = freq;
+  g.gain.value = BEEP_VOLUME;
+  o.connect(g).connect(ctx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  o.stop(ctx.currentTime + dur + 0.02);
+}
+
 function beep(freq, dur) {
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    g.gain.value = 0.06;
-    o.connect(g).connect(audioCtx.destination);
-    o.start();
-    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
-    o.stop(audioCtx.currentTime + dur + 0.02);
-  } catch (_) { /* no audio */ }
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      void resumeAudioContextForGame().then((ready) => {
+        if (ready) playTone(ctx, freq, dur);
+      });
+      return;
+    }
+
+    if (ctx.state !== 'running') {
+      reportAudioStatus(AUDIO_STATUS.BLOCKED);
+      return;
+    }
+
+    playTone(ctx, freq, dur);
+  } catch (_) {
+    reportAudioStatus(AUDIO_STATUS.UNSUPPORTED);
+  }
+}
+
+function enableAudioFromTooltip() {
+  void resumeAudioContextForGame().then((ready) => {
+    if (!ready) return;
+    hideAudioTooltip();
+    beep(660, 0.05);
+  });
 }
 
 // ---------- Bird calls ----------
 const birdCallPreloads = new Map();
 const activeBirdCalls = new Set();
+
+function configureBirdCallAudio(audio) {
+  const previousStatus = getMediaAudioStatus(audio);
+
+  try {
+    audio.muted = false;
+    audio.volume = BIRD_CALL_VOLUME;
+  } catch (_) {
+    reportAudioStatus(AUDIO_STATUS.UNSUPPORTED);
+    return;
+  }
+
+  if (previousStatus === AUDIO_STATUS.MUTED || previousStatus === AUDIO_STATUS.LOW) {
+    reportAudioStatus(previousStatus);
+  }
+}
 
 function preloadBirdCalls() {
   for (const bird of BIRDS) {
@@ -1095,18 +1236,27 @@ function playBirdCall(species) {
     };
 
     audio.preload = 'auto';
-    audio.volume = BIRD_CALL_VOLUME;
+    configureBirdCallAudio(audio);
     audio.addEventListener('ended', markDone, { once: true });
     audio.addEventListener('error', markDone, { once: true });
     activeBirdCalls.add(call);
 
     const promise = audio.play();
     if (promise && typeof promise.catch === 'function') {
-      promise.catch(() => stopBirdCall(call));
+      promise
+        .then(() => {
+          const status = getMediaAudioStatus(audio);
+          if (status !== AUDIO_STATUS.OK) reportAudioStatus(status);
+        })
+        .catch(() => {
+          reportAudioStatus(AUDIO_STATUS.BLOCKED);
+          stopBirdCall(call);
+        });
     }
 
     return call;
   } catch (_) {
+    reportAudioStatus(AUDIO_STATUS.UNSUPPORTED);
     return null;
   }
 }
@@ -1287,6 +1437,8 @@ function skipTraining() {
 
 function beginPlay() {
   preloadBirdCalls();
+  remindForAudioExperience();
+  void resumeAudioContextForGame({ reportBlocked: false });
   startTraining();
 }
 
@@ -1322,6 +1474,7 @@ function init() {
 
   $('#btn-training-skip').addEventListener('click', skipTraining);
   $('#btn-reset-scores').addEventListener('click', resetBestScores);
+  audioTipEls.tooltip?.addEventListener('click', enableAudioFromTooltip);
   leaderboardEls.submitAction?.addEventListener('click', openLeaderboardForm);
   leaderboardEls.skipAction?.addEventListener('click', skipLeaderboardSubmission);
   leaderboardEls.cancelAction?.addEventListener('click', closeLeaderboardForm);

@@ -1,9 +1,10 @@
 // Birdle service worker — offline cache
-const CACHE = 'birdle-v14';
+const CACHE = 'birdle-v15';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './js/audio-utils.js',
   './js/game.js',
   './js/fullscreen-utils.js',
   './js/intro-utils.js',
