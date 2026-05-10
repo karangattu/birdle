@@ -9,6 +9,7 @@ const ASSETS = [
   './js/fullscreen-utils.js',
   './js/intro-utils.js',
   './js/leaderboard-utils.js',
+  './js/pwa-install-utils.js',
   './manifest.webmanifest',
   './assets/Birdle game poster.jpg',
   './assets/backdrop.jpg',

@@ -9,6 +9,12 @@ import {
   getIntroTimeoutMs,
   shouldShowIntro,
 } from './intro-utils.js';
+import {
+  dismissInstallPrompt,
+  hasDismissedInstallPrompt,
+  isInstalledDisplayMode,
+  shouldShowInstallPrompt,
+} from './pwa-install-utils.js';
 import { requestAppFullscreen } from './fullscreen-utils.js';
 import {
   AUDIO_STATUS,
@@ -133,6 +139,11 @@ const audioTipEls = {
   tooltip: $('#audio-tooltip'),
   message: $('#audio-tooltip-message'),
 };
+const installEls = {
+  prompt: $('#install-prompt'),
+  action: $('#btn-install-app'),
+  dismiss: $('#btn-dismiss-install'),
+};
 
 // ---------- State ----------
 const state = {
@@ -174,6 +185,10 @@ const introState = {
 const audioTipState = {
   hideTimer: 0,
   reminderShown: false,
+};
+const installPromptState = {
+  event: null,
+  fallbackReady: false,
 };
 
 let nextBirdId = 1;
@@ -271,6 +286,60 @@ function initIntro() {
   if (!introEls.overlay || !introEls.video) return;
   wireIntroEvents();
   introEls.overlay.hidden = true;
+}
+
+function syncInstallPrompt() {
+  if (!installEls.prompt) return;
+
+  installEls.prompt.hidden = !shouldShowInstallPrompt({
+    isInstalledDisplayMode: isInstalledDisplayMode(),
+    dismissed: hasDismissedInstallPrompt(),
+    canInstall: Boolean(installPromptState.event),
+    fallbackReady: installPromptState.fallbackReady,
+  });
+  if (installEls.action) {
+    installEls.action.hidden = !installPromptState.event;
+  }
+}
+
+function handleBeforeInstallPrompt(event) {
+  event.preventDefault();
+  installPromptState.event = event;
+  syncInstallPrompt();
+}
+
+async function promptAppInstall() {
+  const promptEvent = installPromptState.event;
+  if (!promptEvent || !installEls.action) return;
+
+  installEls.action.disabled = true;
+
+  try {
+    await promptEvent.prompt();
+    await promptEvent.userChoice;
+  } catch (_) {
+    /* Browser install prompt failed or was unavailable. */
+  } finally {
+    installPromptState.event = null;
+    installEls.action.disabled = false;
+    syncInstallPrompt();
+  }
+}
+
+function dismissAppInstallPrompt() {
+  dismissInstallPrompt();
+  installPromptState.event = null;
+  syncInstallPrompt();
+}
+
+function handleAppInstalled() {
+  installPromptState.event = null;
+  syncInstallPrompt();
+}
+
+function enableInstallPromptFallback() {
+  installPromptState.fallbackReady = true;
+  syncInstallPrompt();
 }
 
 function startFromLanding() {
@@ -1479,8 +1548,14 @@ function init() {
   leaderboardEls.skipAction?.addEventListener('click', skipLeaderboardSubmission);
   leaderboardEls.cancelAction?.addEventListener('click', closeLeaderboardForm);
   leaderboardEls.submitForm?.addEventListener('submit', submitLeaderboardScore);
+  installEls.action?.addEventListener('click', promptAppInstall);
+  installEls.dismiss?.addEventListener('click', dismissAppInstallPrompt);
+  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  window.addEventListener('appinstalled', handleAppInstalled);
+  window.setTimeout(enableInstallPromptFallback, 1200);
 
   refreshBestPreview();
+  syncInstallPrompt();
   renderLeaderboardLists();
   void loadGlobalLeaderboard();
 
