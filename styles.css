@@ -965,25 +965,37 @@ button { font-family: inherit; cursor: pointer; border: none; }
   .start-overlay {
     top: 0;
     bottom: max(8px, env(safe-area-inset-bottom));
-    gap: 8px;
-    padding-top: clamp(92px, 22vh, 132px);
+    gap: 4px;
+    padding: clamp(70px, 20vh, 96px) 16px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .start-overlay .hint {
     max-width: calc(100vw - 32px);
-    padding: 5px 12px;
-    font-size: 13px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 4px 10px;
+    font-size: 12px;
+    white-space: normal;
   }
   .start-overlay .big-btn {
-    font-size: 18px;
-    padding: 10px 28px;
+    font-size: 16px;
+    padding: 8px 22px;
+  }
+  .start-bests {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+  .start-feedback {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+  .start-leaderboard-high {
+    font-size: 11px;
+    padding: 4px 10px;
   }
   .leaderboard-card-start {
     width: min(480px, calc(100vw - 32px));
-    max-height: min(162px, 42vh);
-    padding: 10px 12px;
+    max-height: min(120px, 28vh);
+    padding: 8px 10px;
   }
   .leaderboard-card-start .leaderboard-heading-icon {
     flex-basis: 36px;
@@ -1013,7 +1025,10 @@ button { font-family: inherit; cursor: pointer; border: none; }
     font-size: 20px;
   }
   .start-footer {
-    padding: 4px 12px;
+    padding: 3px 10px;
+  }
+  .start-footer .link-btn {
+    font-size: 11px;
   }
   #bird-buttons { grid-template-columns: repeat(10, 1fr); }
   .bird-btn img { display: none; }
