@@ -28,6 +28,8 @@ alter table public.birdle_leaderboad enable row level security;
 
 grant select, insert on public.birdle_leaderboad to anon;
 grant select, insert on public.birdle_leaderboad to authenticated;
+grant usage, select on sequence public.birdle_leaderboad_id_seq to anon;
+grant usage, select on sequence public.birdle_leaderboad_id_seq to authenticated;
 
 drop policy if exists "Birdle leaderboard is readable" on public.birdle_leaderboad;
 create policy "Birdle leaderboard is readable"
