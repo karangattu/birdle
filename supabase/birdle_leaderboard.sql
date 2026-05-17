@@ -51,3 +51,6 @@ create policy "Birdle leaderboard accepts public inserts"
     and hits >= 0
     and misses >= 0
   );
+
+-- Enable Realtime for live leaderboard updates
+alter publication supabase_realtime add table public.birdle_leaderboad;

@@ -45,7 +45,6 @@ const AUDIO_REMINDER_HIDE_MS = 4200;
 const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
 const LEADERBOARD_TABLE = 'birdle_leaderboad';
-const LEADERBOARD_NAME_KEY = 'birdle_leaderboard_name';
 const INTRO_FALLBACK_MS = 2600;
 const SUPABASE_URL = 'https://ovwktjjeoowlktdfbuuu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU';
@@ -63,6 +62,11 @@ function createSupabaseClient() {
         persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 2,
+        },
       },
     });
   } catch (_) {
@@ -377,19 +381,7 @@ function formatLeaderboardDate(value) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function getStoredLeaderboardName() {
-  try {
-    return localStorage.getItem(LEADERBOARD_NAME_KEY) || '';
-  } catch (_) {
-    return '';
-  }
-}
 
-function storeLeaderboardName(name) {
-  try {
-    localStorage.setItem(LEADERBOARD_NAME_KEY, name);
-  } catch (_) { /* ignore */ }
-}
 
 function setLeaderboardControlsDisabled(disabled) {
   ['submitAction', 'skipAction', 'saveAction', 'cancelAction', 'submitName'].forEach((key) => {
@@ -414,7 +406,7 @@ function resetLeaderboardRoundState() {
   leaderboardState.lastSubmittedName = '';
   setLeaderboardControlsDisabled(false);
   setSubmitFeedback('');
-  if (leaderboardEls.submitName) leaderboardEls.submitName.value = getStoredLeaderboardName();
+  if (leaderboardEls.submitName) leaderboardEls.submitName.value = '';
   if (leaderboardEls.submitCard) leaderboardEls.submitCard.hidden = true;
   if (leaderboardEls.submitButtons) leaderboardEls.submitButtons.hidden = false;
   if (leaderboardEls.submitForm) leaderboardEls.submitForm.hidden = true;
@@ -634,6 +626,27 @@ async function loadGlobalLeaderboard(force = false) {
   return leaderboardState.fetchPromise;
 }
 
+function subscribeToLeaderboardChanges() {
+  if (!supabaseClient) return;
+
+  try {
+    supabaseClient
+      .channel('leaderboard-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: LEADERBOARD_TABLE,
+      }, () => {
+        if (leaderboardState.phase !== 'disabled') {
+          void loadGlobalLeaderboard(true);
+        }
+      })
+      .subscribe();
+  } catch (_) {
+    // Realtime not available; leaderboard will still refresh on game end.
+  }
+}
+
 function openLeaderboardForm() {
   if (leaderboardState.submitting) return;
   leaderboardState.formVisible = true;
@@ -687,7 +700,6 @@ async function submitLeaderboardScore(event) {
 
     if (error) throw error;
 
-    storeLeaderboardName(validation.value);
     leaderboardState.lastSubmittedName = validation.value;
     leaderboardState.submittedThisGame = true;
     leaderboardState.skippedThisGame = false;
@@ -1519,7 +1531,6 @@ function init() {
 
   if (leaderboardEls.submitName) {
     leaderboardEls.submitName.maxLength = MAX_LEADERBOARD_NAME_LENGTH;
-    leaderboardEls.submitName.value = getStoredLeaderboardName();
     leaderboardEls.submitName.addEventListener('input', () => {
       if (!leaderboardState.submitting) setSubmitFeedback('');
     });
@@ -1558,6 +1569,7 @@ function init() {
   syncInstallPrompt();
   renderLeaderboardLists();
   void loadGlobalLeaderboard();
+  subscribeToLeaderboardChanges();
 
   // Register service worker for offline play
   if ('serviceWorker' in navigator) {
