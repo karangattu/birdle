@@ -25,29 +25,3 @@ It's a static site — no build step.
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
-
-## Supabase leaderboard setup
-
-Run the SQL in [supabase/birdle_leaderboard.sql](supabase/birdle_leaderboard.sql) inside the Supabase SQL Editor before using the live leaderboard. It creates the exact table requested by the app, `birdle_leaderboad`, plus the index and RLS policies needed for public reads and inserts from the static site.
-
-## Deploy
-
-A GitHub Actions workflow at [.github/workflows/deploy.yml](.github/workflows/deploy.yml) publishes the repository contents to GitHub Pages on every push to `main`.
-
-**One-time setup:** in your repo, go to **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-
-## Project structure
-
-```
-index.html              # Markup + screens (start, difficulty, game, end)
-styles.css              # Layout, animations, responsive HUD
-js/game.js              # Game engine: spawning, scoring, combos, sound
-js/leaderboard-utils.js # Shared leaderboard rules (top-5 qualification, name validation)
-supabase/               # SQL setup for the Supabase leaderboard table and policies
-assets/                 # Backdrop, binoculars, bird images, bird calls, poster
-.github/workflows/      # GitHub Pages deploy
-```
-
-## Tweaking difficulty
-
-Edit the `DIFFICULTY` object in [js/game.js](js/game.js) to change spawn rates, bird lifetime, max concurrent birds, and points.
