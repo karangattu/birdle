@@ -1,6 +1,7 @@
 import {
   LEADERBOARD_LIMIT,
   MAX_LEADERBOARD_NAME_LENGTH,
+  getUniqueLeaderboardEntries,
   scoreQualifies,
   sortLeaderboardEntries,
   validateLeaderboardName,
@@ -489,14 +490,14 @@ function renderLeaderboardList(listEl, statusEl) {
   statusEl.textContent = leaderboardStatusText();
   listEl.textContent = '';
 
-  const entries = sortLeaderboardEntries(leaderboardState.entries).slice(0, LEADERBOARD_LIMIT);
+  const entries = getUniqueLeaderboardEntries(leaderboardState.entries).slice(0, LEADERBOARD_LIMIT);
   for (const [index, entry] of entries.entries()) {
     listEl.appendChild(createLeaderboardItem(entry, index));
   }
 }
 
 function startLeaderboardHighText() {
-  const topEntry = sortLeaderboardEntries(leaderboardState.entries)[0];
+  const topEntry = getUniqueLeaderboardEntries(leaderboardState.entries)[0];
   if (topEntry) {
     const playerName = topEntry.player_name || 'Player';
     return `Global leaderboard high score: ${topEntry.score} by ${playerName}`;
@@ -605,10 +606,9 @@ async function loadGlobalLeaderboard(force = false) {
     .select('id, player_name, score, difficulty, created_at')
     .order('score', { ascending: false })
     .order('created_at', { ascending: true })
-    .limit(LEADERBOARD_LIMIT)
     .then(({ data, error }) => {
       if (error) throw error;
-      leaderboardState.entries = sortLeaderboardEntries(data || []).slice(0, LEADERBOARD_LIMIT);
+      leaderboardState.entries = sortLeaderboardEntries(data || []);
       leaderboardState.phase = 'ready';
       return leaderboardState.entries;
     })

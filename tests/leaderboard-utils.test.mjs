@@ -30,6 +30,40 @@ test('score must beat the current fifth place when leaderboard is full', async (
   assert.equal(scoreQualifies(125, topFive), false);
 });
 
+test('score qualifies using unique player names only', async () => {
+  const { scoreQualifies } = await loadHelpers();
+
+  const entries = [
+    { player_name: 'Karan', score: 500 },
+    { player_name: 'Karan', score: 400 },
+    { player_name: 'Nate', score: 450 },
+    { player_name: 'The Man', score: 350 },
+    { player_name: 'Bird', score: 250 },
+    { player_name: 'Bee', score: 200 },
+  ];
+
+  assert.equal(scoreQualifies(260, entries, 5), true);
+  assert.equal(scoreQualifies(190, entries, 5), false);
+});
+
+test('unique leaderboard entries keep only the highest score per player', async () => {
+  const { getUniqueLeaderboardEntries } = await loadHelpers();
+
+  const entries = [
+    { player_name: 'Karan', score: 100 },
+    { player_name: 'Karan', score: 60 },
+    { player_name: 'Nate', score: 80 },
+    { player_name: 'The Man', score: 50 },
+  ];
+
+  const unique = getUniqueLeaderboardEntries(entries);
+  assert.deepEqual(unique.map((entry) => ({ player_name: entry.player_name, score: entry.score })), [
+    { player_name: 'Karan', score: 100 },
+    { player_name: 'Nate', score: 80 },
+    { player_name: 'The Man', score: 50 },
+  ]);
+});
+
 test('leaderboard names are trimmed and collapsed before submit', async () => {
   const { normalizeLeaderboardName } = await loadHelpers();
 

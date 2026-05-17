@@ -21,7 +21,7 @@ export function validateLeaderboardName(value) {
 
 export function scoreQualifies(score, entries, limit = LEADERBOARD_LIMIT) {
   const safeScore = Number.isFinite(score) ? score : Number(score) || 0;
-  const scores = (entries || [])
+  const scores = getUniqueLeaderboardEntries(entries)
     .map((entry) => Number(entry?.score) || 0)
     .sort((left, right) => right - left);
 
@@ -38,4 +38,21 @@ export function sortLeaderboardEntries(entries) {
     const rightTime = Date.parse(right?.created_at || '') || Number.MAX_SAFE_INTEGER;
     return leftTime - rightTime;
   });
+}
+
+export function getUniqueLeaderboardEntries(entries) {
+  const uniqueEntries = new Map();
+
+  for (const [index, entry] of sortLeaderboardEntries(entries || []).entries()) {
+    const playerName = entry?.player_name;
+    const key = typeof playerName === 'string'
+      ? normalizeLeaderboardName(playerName).toLowerCase()
+      : `__entry_${index}`;
+
+    if (!uniqueEntries.has(key)) {
+      uniqueEntries.set(key, entry);
+    }
+  }
+
+  return Array.from(uniqueEntries.values());
 }
