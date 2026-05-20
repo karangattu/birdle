@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 async function loadHelpers() {
   try {
@@ -56,4 +58,18 @@ test('intro timeout adds a short buffer after the media duration', async () => {
   const { getIntroTimeoutMs } = await loadHelpers();
 
   assert.equal(getIntroTimeoutMs(2.9, 2600), 3400);
+});
+
+test('intro video source is correct in index.html', () => {
+  const htmlPath = path.join(process.cwd(), 'index.html');
+  const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+  assert.match(htmlContent, /src="assets\/intro_video\.mp4"/);
+  assert.doesNotMatch(htmlContent, /src="assets\/birdle_intro\.mp4"/);
+});
+
+test('intro video is correct in service worker cache assets', () => {
+  const swPath = path.join(process.cwd(), 'sw.js');
+  const swContent = fs.readFileSync(swPath, 'utf8');
+  assert.match(swContent, /'(\.\/)?assets\/intro_video\.mp4'/);
+  assert.doesNotMatch(swContent, /'(\.\/)?assets\/birdle_intro\.mp4'/);
 });

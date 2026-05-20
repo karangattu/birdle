@@ -1,5 +1,5 @@
 // Birdle service worker — offline cache
-const CACHE = 'birdle-v15';
+const CACHE = 'birdle-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,7 @@ const ASSETS = [
   './manifest.webmanifest',
   './assets/Birdle game poster.jpg',
   './assets/backdrop.jpg',
-  './assets/birdle_intro.mp4',
+  './assets/intro_video.mp4',
   './assets/binocular.png',
   './assets/sfbbo_logo.png',
   './assets/american_crow.png',
