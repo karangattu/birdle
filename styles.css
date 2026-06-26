@@ -1373,3 +1373,209 @@ button { font-family: inherit; cursor: pointer; border: none; }
 @media (orientation: landscape) and (max-height: 520px) {
   #training-buttons { grid-template-columns: repeat(10, 1fr); }
 }
+
+/* ---------- Broad Daylight Mode ---------- */
+body.daylight-mode {
+  color: #051405;
+  background: #f7faf7;
+}
+body.daylight-mode #app,
+body.daylight-mode #app:fullscreen,
+body.daylight-mode #screen-start,
+body.daylight-mode #screen-difficulty,
+body.daylight-mode #screen-end,
+body.daylight-mode #screen-howto {
+  background: #f7faf7;
+}
+body.daylight-mode .modal {
+  color: #051405;
+}
+body.daylight-mode .modal h1 {
+  color: #051405;
+  text-shadow: none;
+}
+body.daylight-mode .howto-list li {
+  background: rgba(0,0,0,0.04);
+  border: 2px solid rgba(0,0,0,0.08);
+  color: #000000;
+}
+body.daylight-mode .howto-icon svg {
+  stroke: #051405;
+}
+body.daylight-mode .link-btn {
+  color: #0b5e0b;
+  font-weight: 700;
+}
+body.daylight-mode .footer-separator {
+  color: #051405;
+}
+body.daylight-mode .poster {
+  filter: brightness(1.2);
+}
+body.daylight-mode .start-overlay .hint {
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.1);
+  color: #000000;
+}
+body.daylight-mode .start-bests {
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.1);
+  color: #0b5e0b;
+  font-weight: 700;
+}
+body.daylight-mode .start-leaderboard-high {
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.1);
+  color: #000000;
+  text-shadow: none;
+}
+body.daylight-mode .big-btn {
+  border: 2px solid #051405;
+  box-shadow: 0 6px 0 #051405;
+}
+body.daylight-mode .big-btn:active {
+  box-shadow: 0 2px 0 #051405;
+}
+body.daylight-mode .diff-btn {
+  border: 2px solid #051405;
+}
+body.daylight-mode .hud-item {
+  background: #ffffff;
+  border: 2px solid #051405;
+  color: #051405;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+body.daylight-mode .hud-item .lbl {
+  color: #051405;
+  opacity: 0.8;
+  font-weight: 700;
+}
+body.daylight-mode #combo.hot {
+  color: #cc8400;
+  text-shadow: none;
+}
+body.daylight-mode #backdrop {
+  filter: brightness(1.3) contrast(1.15) saturate(1.1);
+}
+body.daylight-mode #backdrop::before,
+body.daylight-mode #backdrop::after {
+  display: none;
+}
+body.daylight-mode #training-backdrop {
+  filter: brightness(1.3) contrast(1.15) saturate(1.1);
+}
+body.daylight-mode #training-backdrop::before {
+  display: none;
+}
+body.daylight-mode .bird {
+  filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 3px #ffffff) drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+}
+body.daylight-mode .bird-btn {
+  border: 2px solid #051405;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 4px 0 #051405;
+}
+body.daylight-mode .bird-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #051405;
+}
+body.daylight-mode .bird-btn.flash-correct {
+  background: #4cd14c;
+}
+body.daylight-mode .bird-btn.flash-wrong {
+  background: #ff5252;
+}
+body.daylight-mode #final-score {
+  color: #0b5e0b;
+}
+body.daylight-mode .rank-icon {
+  color: #0b5e0b;
+}
+body.daylight-mode .rank-title {
+  color: #000000;
+  text-shadow: none;
+}
+body.daylight-mode .rank-sub {
+  color: #333333;
+  opacity: 1;
+  font-weight: 700;
+}
+body.daylight-mode .stats {
+  color: #000000;
+  opacity: 1;
+  font-weight: 700;
+}
+body.daylight-mode .final {
+  color: #000000;
+  font-weight: 700;
+}
+body.daylight-mode .leaderboard-card {
+  background: #e8efe8;
+  border: 2px solid #051405;
+  color: #000000;
+}
+body.daylight-mode .leaderboard-entry {
+  background: rgba(0,0,0,0.04);
+  border: 2px solid rgba(0,0,0,0.08);
+  color: #000000;
+}
+body.daylight-mode .leaderboard-rank {
+  background: rgba(0,0,0,0.1);
+  color: #000000;
+}
+body.daylight-mode .leaderboard-status {
+  color: #000000;
+}
+body.daylight-mode .leaderboard-submit {
+  background: #e8efe8;
+  border: 2px solid #051405;
+  color: #000000;
+}
+body.daylight-mode .leaderboard-submit-title {
+  color: #051405;
+}
+body.daylight-mode .leaderboard-form label {
+  color: #051405;
+}
+body.daylight-mode .leaderboard-form input {
+  border: 2px solid #051405;
+  background: #ffffff;
+  color: #000000;
+}
+body.daylight-mode .leaderboard-form input::placeholder {
+  color: #555555;
+}
+body.daylight-mode .leaderboard-submit-feedback.info { color: #0b5e0b; }
+body.daylight-mode .leaderboard-submit-feedback.success { color: #076d29; }
+body.daylight-mode .leaderboard-submit-feedback.error { color: #8c0a0a; }
+body.daylight-mode #rotate-overlay {
+  background: #f7faf7;
+  color: #051405;
+}
+body.daylight-mode .install-prompt {
+  background: #e8efe8;
+  border: 2px solid #051405;
+  color: #000000;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.25);
+}
+body.daylight-mode .install-title {
+  color: #0b5e0b;
+}
+body.daylight-mode .install-copy p {
+  color: #333333;
+}
+body.daylight-mode #training-banner {
+  background: #ffffff;
+  border: 2px solid #051405;
+  color: #000000;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+body.daylight-mode .training-step {
+  color: #0b5e0b;
+  font-weight: 800;
+}
+body.daylight-mode .training-msg {
+  color: #000000;
+}
+

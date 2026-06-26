@@ -17,6 +17,7 @@ import {
   shouldShowInstallPrompt,
 } from './pwa-install-utils.js';
 import { requestAppFullscreen } from './fullscreen-utils.js';
+import { requestWakeLock, releaseWakeLock } from './wake-lock-utils.js';
 import {
   AUDIO_STATUS,
   audioStatusMessage,
@@ -202,6 +203,11 @@ let nextBirdId = 1;
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  if (name === 'game' || name === 'training') {
+    void requestWakeLock();
+  } else {
+    void releaseWakeLock();
+  }
 }
 
 function prefersReducedMotion() {
@@ -1528,6 +1534,34 @@ function init() {
   buildBirdButtons();
   resetLeaderboardRoundState();
   initIntro();
+
+  const daylightBtn = $('#btn-toggle-daylight');
+  if (daylightBtn) {
+    let isDaylightMode = false;
+    try {
+      isDaylightMode = localStorage.getItem('birdle_daylight_mode') === 'true';
+    } catch (_) {}
+    if (isDaylightMode) {
+      document.body.classList.add('daylight-mode');
+      daylightBtn.textContent = '☾ Dark Mode';
+    } else {
+      document.body.classList.remove('daylight-mode');
+      daylightBtn.textContent = '☀ Broad Daylight Mode';
+    }
+    daylightBtn.addEventListener('click', () => {
+      isDaylightMode = !isDaylightMode;
+      if (isDaylightMode) {
+        document.body.classList.add('daylight-mode');
+        daylightBtn.textContent = '☾ Dark Mode';
+      } else {
+        document.body.classList.remove('daylight-mode');
+        daylightBtn.textContent = '☀ Broad Daylight Mode';
+      }
+      try {
+        localStorage.setItem('birdle_daylight_mode', String(isDaylightMode));
+      } catch (_) {}
+    });
+  }
 
   if (leaderboardEls.submitName) {
     leaderboardEls.submitName.maxLength = MAX_LEADERBOARD_NAME_LENGTH;
