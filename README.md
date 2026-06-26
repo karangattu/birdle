@@ -16,6 +16,8 @@ A fast-paced backyard bird-spotting game. Birds appear in the trees and play the
 
 American Crow · American Robin · Black Phoebe · California Towhee · Cedar Waxwing · Dark-eyed Junco · Hermit Thrush · House Finch · Scrub Jay · Spotted Towhee
 
+![Birdle Reference Sheet](assets/reference_sheet.png)
+
 ## Run locally
 
 It's a static site — no build step.
