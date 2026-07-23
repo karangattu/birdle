@@ -159,6 +159,8 @@ const state = {
   bestCombo: 1,
   hits: 0,
   misses: 0,
+  speciesHits: new Map(),
+  speciesMisses: new Map(),
   timeLeft: 60,
   active: new Map(),       // birdEl id -> { species, el, expireAt, call }
   recentlyExpired: [],     // birds that vanished during a just-started tap
@@ -925,6 +927,7 @@ function onGuess(speciesId, btnEl) {
 
   if (match) {
     state.hits++;
+    state.speciesHits.set(speciesId, (state.speciesHits.get(speciesId) || 0) + 1);
     state.combo += 1;
     if (state.combo > state.bestCombo) state.bestCombo = state.combo;
     const multiplier = Math.min(5, 1 + Math.floor((state.combo - 1) / 3));
@@ -945,6 +948,7 @@ function onGuess(speciesId, btnEl) {
     }
   } else {
     state.misses++;
+    state.speciesMisses.set(speciesId, (state.speciesMisses.get(speciesId) || 0) + 1);
     state.combo = 1;
     state.score += cfg.pointsMiss;
     if (state.score < 0) state.score = 0;
@@ -1050,6 +1054,68 @@ function applyRank(score, level) {
   $('#rank-sub').textContent = sub;
 }
 
+function renderFieldLog() {
+  const container = $('#field-log');
+  if (!container) return;
+
+  if (state.speciesHits.size === 0 && state.speciesMisses.size === 0) {
+    container.hidden = true;
+    container.innerHTML = '';
+    return;
+  }
+
+  let mostSpotted = null;
+  let maxHits = 0;
+  for (const [id, count] of state.speciesHits.entries()) {
+    if (count > maxHits) {
+      maxHits = count;
+      mostSpotted = id;
+    }
+  }
+
+  let trickySpecies = null;
+  let maxMisses = 0;
+  for (const [id, count] of state.speciesMisses.entries()) {
+    if (count > maxMisses) {
+      maxMisses = count;
+      trickySpecies = id;
+    }
+  }
+
+  const items = [];
+  if (mostSpotted && maxHits > 0) {
+    const bird = BIRDS.find(b => b.id === mostSpotted);
+    if (bird) {
+      items.push(`
+        <div class="field-log-item">
+          <span class="field-log-label">Most Spotted:</span>
+          <span class="field-log-val">${bird.name} (${maxHits}x)</span>
+        </div>
+      `);
+    }
+  }
+
+  if (trickySpecies && maxMisses > 0) {
+    const bird = BIRDS.find(b => b.id === trickySpecies);
+    if (bird) {
+      items.push(`
+        <div class="field-log-item">
+          <span class="field-log-label">Tricky Species:</span>
+          <span class="field-log-val">${bird.name} (${maxMisses} ${maxMisses === 1 ? 'miss' : 'misses'})</span>
+        </div>
+      `);
+    }
+  }
+
+  if (items.length > 0) {
+    container.innerHTML = items.join('');
+    container.hidden = false;
+  } else {
+    container.hidden = true;
+    container.innerHTML = '';
+  }
+}
+
 function flashBtn(btn, cls) {
   if (!btn) return;
   btn.classList.remove('flash-correct','flash-wrong');
@@ -1103,6 +1169,8 @@ function startGame(level) {
   state.bestCombo = 1;
   state.hits = 0;
   state.misses = 0;
+  state.speciesHits.clear();
+  state.speciesMisses.clear();
   state.timeLeft = DIFFICULTY[level].duration;
   state.running = false; // remains false during countdown
 
@@ -1178,6 +1246,7 @@ function endGame() {
   } catch (_) { /* ignore */ }
 
   refreshBestPreview();
+  renderFieldLog();
   showScreen('end');
   syncLeaderboardSubmitCard();
   void loadGlobalLeaderboard(true);
@@ -1523,6 +1592,11 @@ function skipTraining() {
 }
 
 function beginPlay() {
+  void requestAppFullscreen({
+    target: $('#app') || document.documentElement,
+    doc: document,
+    orientation: window.screen?.orientation,
+  });
   preloadBirdCalls();
   remindForAudioExperience();
   void resumeAudioContextForGame({ reportBlocked: false });
