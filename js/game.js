@@ -23,6 +23,15 @@ import {
   audioStatusMessage,
   getMediaAudioStatus,
 } from './audio-utils.js';
+import { getHitPoints, clampScore } from './scoring-utils.js';
+import { getRankProgress } from './rank-utils.js';
+import {
+  pickSpawnSpecies,
+  getSpawnDelayMs,
+  getBirdLifeMs,
+  pickSpawnPosition,
+  randomBetween,
+} from './spawn-utils.js';
 
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
@@ -46,7 +55,7 @@ const AUDIO_TIP_HIDE_MS = 5200;
 const AUDIO_REMINDER_HIDE_MS = 4200;
 const EXPIRED_GUESS_GRACE_MS = 250;
 const POINTER_CLICK_SUPPRESS_MS = 700;
-const LEADERBOARD_TABLE = 'birdle_leaderboad';
+const LEADERBOARD_TABLE = 'birdle_leaderboard';
 const INTRO_FALLBACK_MS = 2600;
 const SUPABASE_URL = 'https://ovwktjjeoowlktdfbuuu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_B2pz5WTA3UEVUeKACIgmBw_8_r0S3kU';
@@ -150,6 +159,11 @@ const installEls = {
   action: $('#btn-install-app'),
   dismiss: $('#btn-dismiss-install'),
 };
+const pauseEls = {
+  overlay: $('#pause-overlay'),
+  resume: $('#btn-resume'),
+  quit: $('#btn-pause-quit'),
+};
 
 // ---------- State ----------
 const state = {
@@ -168,6 +182,7 @@ const state = {
   tickTimer: null,
   endAt: 0,
   running: false,
+  paused: false,
 };
 
 const leaderboardState = {
@@ -759,9 +774,6 @@ function bindInstantPress(button, handler) {
 }
 
 // ---------- Spawning ----------
-function rand(min, max) { return Math.random() * (max - min) + min; }
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
 function gameRect() {
   return screens.game.getBoundingClientRect();
 }
@@ -776,11 +788,9 @@ function trySpawn() {
   if (state.active.size >= cfg.maxConcurrent) return scheduleNextSpawn();
 
   // Pick a species not currently on screen.
-  const used = activeSpecies();
-  const candidates = BIRDS.filter(b => !used.has(b.id));
-  if (candidates.length === 0) return scheduleNextSpawn();
+  const species = pickSpawnSpecies(BIRDS, activeSpecies());
+  if (!species) return scheduleNextSpawn();
 
-  const species = pick(candidates);
   spawnBird(species);
   scheduleNextSpawn();
 }
@@ -788,7 +798,7 @@ function trySpawn() {
 function scheduleNextSpawn() {
   const cfg = DIFFICULTY[state.level];
   clearTimeout(state.spawnTimer);
-  state.spawnTimer = setTimeout(trySpawn, rand(cfg.spawnEveryMin, cfg.spawnEveryMax));
+  state.spawnTimer = setTimeout(trySpawn, getSpawnDelayMs(cfg));
 }
 
 function spawnBird(species) {
@@ -797,7 +807,7 @@ function spawnBird(species) {
 
   // Bird element sized relative to viewport
   const baseSize = Math.min(rect.width, rect.height);
-  const size = Math.round(baseSize * rand(0.09, 0.14));
+  const size = Math.round(baseSize * randomBetween(0.09, 0.14));
   const flip = Math.random() < 0.5;
 
   // Pick a position inside the tree zone, ensuring no overlap with same area
@@ -809,7 +819,8 @@ function spawnBird(species) {
   el.style.height = size + 'px';
   el.style.left   = pos.x + 'px';
   el.style.top    = pos.y + 'px';
-  el.innerHTML = `<img src="${species.img}" alt="${species.name}" draggable="false" />`;
+  // Generic alt: naming the species here would spoil the game for screen-reader users.
+  el.innerHTML = `<img src="${species.img}" alt="" draggable="false" />`;
 
   const id = nextBirdId++;
   el.dataset.id = id;
@@ -818,7 +829,7 @@ function spawnBird(species) {
   // Birds are NOT directly clickable — players must use the name buttons.
   birdLayer.appendChild(el);
 
-  const life = rand(cfg.birdLifeMin, cfg.birdLifeMax);
+  const life = getBirdLifeMs(cfg);
   const expireAt = performance.now() + life;
   const entry = { species: species.id, el, expireAt, timeoutId: 0, call: playBirdCall(species) };
   entry.timeoutId = setTimeout(() => removeBird(id, false, true), life);
@@ -827,34 +838,18 @@ function spawnBird(species) {
 
 // Try a few random spots; if all collide, accept the last one.
 function pickPosition(rect, size) {
-  const xMin = TREE_ZONE.xMin * rect.width;
-  const xMax = TREE_ZONE.xMax * rect.width  - size;
-  const yMin = TREE_ZONE.yMin * rect.height;
-  const yMax = TREE_ZONE.yMax * rect.height - size;
-
-  let best = { x: rand(xMin, xMax), y: rand(yMin, yMax) };
-  for (let i = 0; i < 12; i++) {
-    const cand = { x: rand(xMin, xMax), y: rand(yMin, yMax) };
-    if (!collidesAny(cand, size)) return cand;
-    best = cand;
-  }
-  return best;
-}
-
-function collidesAny(p, size) {
-  for (const { el } of state.active.values()) {
-    const x = parseFloat(el.style.left);
-    const y = parseFloat(el.style.top);
-    const w = parseFloat(el.style.width);
-    const h = parseFloat(el.style.height);
-    // Allow some overlap (30%) — birds can overlap, just not heavily stacked
-    const pad = -0.3 * Math.min(w, size);
-    if (p.x < x + w + pad && p.x + size > x - pad &&
-        p.y < y + h + pad && p.y + size > y - pad) {
-      return true;
-    }
-  }
-  return false;
+  const occupied = [...state.active.values()].map(({ el }) => ({
+    x: parseFloat(el.style.left),
+    y: parseFloat(el.style.top),
+    size: parseFloat(el.style.width),
+  }));
+  return pickSpawnPosition({
+    zone: TREE_ZONE,
+    width: rect.width,
+    height: rect.height,
+    size,
+    occupied,
+  });
 }
 
 function removeBird(id, caught, allowGrace = false) {
@@ -909,7 +904,7 @@ function claimRecentlyExpiredBird(speciesId) {
 
 // ---------- Guessing ----------
 function onGuess(speciesId, btnEl) {
-  if (!state.running) return;
+  if (!state.running || state.paused) return;
   const cfg = DIFFICULTY[state.level];
 
   // Find an active bird matching this species (closest to expiring first)
@@ -930,8 +925,7 @@ function onGuess(speciesId, btnEl) {
     state.speciesHits.set(speciesId, (state.speciesHits.get(speciesId) || 0) + 1);
     state.combo += 1;
     if (state.combo > state.bestCombo) state.bestCombo = state.combo;
-    const multiplier = Math.min(5, 1 + Math.floor((state.combo - 1) / 3));
-    const gained = cfg.pointsHit * multiplier;
+    const gained = getHitPoints(state.combo, cfg.pointsHit);
     state.score += gained;
     updateHUD();
     flashBtn(btnEl, 'flash-correct');
@@ -950,8 +944,7 @@ function onGuess(speciesId, btnEl) {
     state.misses++;
     state.speciesMisses.set(speciesId, (state.speciesMisses.get(speciesId) || 0) + 1);
     state.combo = 1;
-    state.score += cfg.pointsMiss;
-    if (state.score < 0) state.score = 0;
+    state.score = clampScore(state.score + cfg.pointsMiss);
     updateHUD();
     flashBtn(btnEl, 'flash-wrong');
     if (btnEl) {
@@ -1022,32 +1015,15 @@ const RANK_ICONS = {
   crown:      '<path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/>',
 };
 
-const RANK_TIERS = [
-  // thresholds are in "score" units; multiplied by level multiplier
-  { min: 0,   icon: 'egg',        title: 'Curious Hatchling',    sub: "Every legend starts with a single squint. You showed up — that counts!" },
-  { min: 30,  icon: 'feather',    title: 'Backyard Apprentice',  sub: "You're picking up feathers fast. The birds are starting to notice you." },
-  { min: 80,  icon: 'binoculars', title: 'Sharp-eyed Spotter',   sub: "Solid spotting. Your binoculars are starting to feel earned." },
-  { min: 150, icon: 'bird',       title: 'Birder in Training',   sub: "Field-guide energy. You're calling birds before they land." },
-  { min: 240, icon: 'award',      title: 'Field Guide Pro',      sub: "Confident IDs, clean combos. The trees fear you." },
-  { min: 360, icon: 'trophy',     title: 'Audubon-tier Ace',     sub: "Top-shelf birding. You and the warblers go way back." },
-  { min: 520, icon: 'crown',      title: 'Legendary Birdle Sage', sub: "Mythical. Birds form a queue to be identified by you." },
-];
-
 function applyRank(score, level) {
-  const mult = level === 'expert' ? 0.7 : 1.0; // expert thresholds slightly easier
-  let tier = RANK_TIERS[0];
-  for (const t of RANK_TIERS) {
-    if (score >= t.min * mult) tier = t;
-  }
-  const next = RANK_TIERS.find(t => score < t.min * mult);
+  const { tier, next, pointsToNext } = getRankProgress(score, level);
 
   const icon = $('#rank-icon');
   icon.innerHTML = RANK_ICONS[tier.icon];
   $('#rank-title').textContent = tier.title;
   let sub = tier.sub;
   if (next) {
-    const need = Math.ceil(next.min * mult - score);
-    sub += ` (Next: ${next.title} — ${need} more pts.)`;
+    sub += ` (Next: ${next.title} — ${pointsToNext} more pts.)`;
   } else {
     sub += ' Maxed-out tier. Bow before the spotter.';
   }
@@ -1173,6 +1149,9 @@ function startGame(level) {
   state.speciesMisses.clear();
   state.timeLeft = DIFFICULTY[level].duration;
   state.running = false; // remains false during countdown
+  state.paused = false;
+  pauseState.countdownWasRunning = false;
+  pauseEls.overlay?.classList.add('hidden');
 
   birdLayer.innerHTML = '';
   popupLayer.innerHTML = '';
@@ -1191,31 +1170,54 @@ function startGame(level) {
   });
 }
 
+const countdownState = { timerId: 0, running: false, done: null };
+const GO_HOLD_MS = 600;
+
+function popCountdownText(numEl, text) {
+  numEl.textContent = text;
+  // Restart the pop animation
+  numEl.style.animation = 'none';
+  void numEl.offsetWidth;
+  numEl.style.animation = '';
+}
+
 function runCountdown(from, done) {
   const overlay = $('#countdown');
   const numEl   = $('#countdown-num');
+  countdownState.done = done;
+  countdownState.running = true;
   screens.game.classList.add('countdown');
   overlay.classList.remove('hidden');
 
   let n = from;
   const tick = () => {
     if (n <= 0) {
-      overlay.classList.add('hidden');
-      screens.game.classList.remove('countdown');
+      popCountdownText(numEl, 'Go!');
+      vibrate(40);
+      beep(880, 0.12);
+      countdownState.running = false;
+      // The game starts on "Go!"; the overlay lingers briefly, then fades.
+      countdownState.timerId = setTimeout(() => {
+        overlay.classList.add('hidden');
+        screens.game.classList.remove('countdown');
+      }, GO_HOLD_MS);
       done();
       return;
     }
-    numEl.textContent = n === 0 ? 'Go!' : n;
-    // Restart the pop animation
-    numEl.style.animation = 'none';
-    void numEl.offsetWidth;
-    numEl.style.animation = '';
+    popCountdownText(numEl, String(n));
     vibrate(40);
     beep(n === 1 ? 660 : 440, 0.08);
     n--;
-    setTimeout(tick, 1000);
+    countdownState.timerId = setTimeout(tick, 1000);
   };
   tick();
+}
+
+function cancelCountdown() {
+  clearTimeout(countdownState.timerId);
+  countdownState.running = false;
+  $('#countdown').classList.add('hidden');
+  screens.game.classList.remove('countdown');
 }
 
 function endGame() {
@@ -1254,6 +1256,8 @@ function endGame() {
 
 function quitToHome() {
   state.running = false;
+  state.paused = false;
+  cancelCountdown();
   clearTimeout(state.spawnTimer);
   clearInterval(state.tickTimer);
   stopAllBirdCalls();
@@ -1261,7 +1265,76 @@ function quitToHome() {
   popupLayer.innerHTML = '';
   state.active.clear();
   state.recentlyExpired = [];
+  pauseEls.overlay?.classList.add('hidden');
   showScreen('start');
+}
+
+// ---------- Auto-pause (tab/app switch mid-game) ----------
+const pauseState = {
+  startedAt: 0,
+  countdownWasRunning: false,
+};
+
+function pauseGame() {
+  if (state.paused) return;
+  if (!state.running && !countdownState.running) return;
+
+  state.paused = true;
+  pauseState.startedAt = performance.now();
+  pauseState.countdownWasRunning = countdownState.running;
+
+  if (countdownState.running) cancelCountdown();
+  clearTimeout(state.spawnTimer);
+  clearInterval(state.tickTimer);
+
+  // Freeze each bird's remaining lifetime so nothing expires while hidden.
+  const now = performance.now();
+  for (const entry of state.active.values()) {
+    clearTimeout(entry.timeoutId);
+    entry.remainingMs = Math.max(0, entry.expireAt - now);
+  }
+  state.recentlyExpired = [];
+
+  for (const call of activeBirdCalls) {
+    try { call.audio.pause(); } catch (_) { /* ignore */ }
+  }
+
+  pauseEls.overlay?.classList.remove('hidden');
+}
+
+function resumeGame() {
+  if (!state.paused) return;
+  state.paused = false;
+  const pausedMs = performance.now() - pauseState.startedAt;
+  pauseEls.overlay?.classList.add('hidden');
+
+  // Paused mid-countdown: restart it so the player can reorient.
+  if (pauseState.countdownWasRunning) {
+    pauseState.countdownWasRunning = false;
+    runCountdown(3, countdownState.done);
+    return;
+  }
+
+  state.endAt += pausedMs;
+  const now = performance.now();
+  for (const [id, entry] of state.active) {
+    const remainingMs = entry.remainingMs ?? 0;
+    entry.expireAt = now + remainingMs;
+    entry.timeoutId = setTimeout(() => removeBird(id, false, true), remainingMs);
+    delete entry.remainingMs;
+  }
+
+  for (const call of activeBirdCalls) {
+    if (call.stopped) continue;
+    const playAttempt = call.audio.play();
+    if (playAttempt && typeof playAttempt.catch === 'function') {
+      playAttempt.catch(() => { /* audio stays muted; tooltip already explains */ });
+    }
+  }
+
+  scheduleNextSpawn();
+  startTicker();
+  updateHUD();
 }
 
 // ---------- Tiny sound (Web Audio) ----------
@@ -1546,9 +1619,9 @@ function spawnTrainingBird(speciesId) {
   el.className = 'bird training-bird';
   el.style.width  = size + 'px';
   el.style.height = size + 'px';
-  el.style.left   = rand(xMin, xMax) + 'px';
-  el.style.top    = rand(yMin, yMax) + 'px';
-  el.innerHTML = `<img src="${species.img}" alt="${species.name}" draggable="false" />`;
+  el.style.left   = randomBetween(xMin, xMax) + 'px';
+  el.style.top    = randomBetween(yMin, yMax) + 'px';
+  el.innerHTML = `<img src="${species.img}" alt="" draggable="false" />`;
   layer.appendChild(el);
   trainingState.birdEl = el;
   trainingState.call = playBirdCall(species);
@@ -1662,6 +1735,11 @@ function init() {
 
   $('#btn-training-skip').addEventListener('click', skipTraining);
   $('#btn-reset-scores').addEventListener('click', resetBestScores);
+  pauseEls.resume?.addEventListener('click', resumeGame);
+  pauseEls.quit?.addEventListener('click', quitToHome);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') pauseGame();
+  });
   audioTipEls.tooltip?.addEventListener('click', enableAudioFromTooltip);
   leaderboardEls.submitAction?.addEventListener('click', openLeaderboardForm);
   leaderboardEls.skipAction?.addEventListener('click', skipLeaderboardSubmission);

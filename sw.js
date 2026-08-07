@@ -1,21 +1,34 @@
-// Birdle service worker — offline cache
-const CACHE = 'birdle-v16';
-const ASSETS = [
+// Birdle service worker — split precache (core + background media)
+const CACHE = 'birdle-v17';
+
+const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
   './js/audio-utils.js',
-  './js/game.js',
   './js/fullscreen-utils.js',
+  './js/game.js',
   './js/intro-utils.js',
   './js/leaderboard-utils.js',
   './js/pwa-install-utils.js',
+  './js/rank-utils.js',
+  './js/scoring-utils.js',
+  './js/spawn-utils.js',
+  './js/wake-lock-utils.js',
   './manifest.webmanifest',
+  './assets/birdle_logo.png',
+  './assets/sfbbo_logo.png',
+  './assets/apple-touch-icon.png',
+  './assets/pwa-icon-192.png',
+  './assets/pwa-icon-512.png'
+];
+
+const MEDIA_ASSETS = [
   './assets/Birdle game poster.jpg',
   './assets/backdrop.jpg',
-  './assets/intro_video.mp4',
   './assets/binocular.png',
-  './assets/sfbbo_logo.png',
+  './assets/intro_video.mp4',
+  './assets/reference_sheet.png',
   './assets/american_crow.png',
   './assets/american_crow.mp3',
   './assets/american_robin.png',
@@ -32,6 +45,7 @@ const ASSETS = [
   './assets/hermit_thrush.mp3',
   './assets/house_finch.png',
   './assets/house_finch.mp3',
+  './assets/lesser_goldfinch.png',
   './assets/scrub_jay.png',
   './assets/scrub_jay.mp3',
   './assets/spotted_towhee.png',
@@ -40,7 +54,7 @@ const ASSETS = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) => c.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
   );
 });
 
@@ -48,7 +62,12 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    ).then(() => {
+      self.clients.claim();
+      caches.open(CACHE).then((c) => {
+        return Promise.allSettled(MEDIA_ASSETS.map((asset) => c.add(asset)));
+      });
+    })
   );
 });
 
@@ -59,7 +78,6 @@ self.addEventListener('fetch', (e) => {
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((res) => {
-        // Cache same-origin successful responses
         if (res && res.ok && new URL(req.url).origin === location.origin) {
           const clone = res.clone();
           caches.open(CACHE).then((c) => c.put(req, clone));
