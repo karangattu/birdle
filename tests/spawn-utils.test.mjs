@@ -9,61 +9,100 @@ async function loadHelpers() {
   }
 }
 
-test('pickSpawnSpecies selects available bird or returns null when all active', async () => {
+const BIRDS = [
+  { id: 'crow' },
+  { id: 'robin' },
+  { id: 'jay' },
+];
+
+test('spawn species is never one already on screen', async () => {
   const { pickSpawnSpecies } = await loadHelpers();
-  const birds = [{ id: 'crow' }, { id: 'robin' }, { id: 'finch' }];
 
-  const active = new Set(['crow']);
-  const chosen = pickSpawnSpecies(birds, active, () => 0);
-  assert.equal(chosen.id, 'robin');
+  const active = new Set(['crow', 'jay']);
+  for (const rngValue of [0, 0.25, 0.5, 0.75, 0.999]) {
+    const species = pickSpawnSpecies(BIRDS, active, () => rngValue);
+    assert.equal(species.id, 'robin');
+  }
+});
 
-  const allActive = new Set(['crow', 'robin', 'finch']);
-  assert.equal(pickSpawnSpecies(birds, allActive), null);
+test('spawn species returns null when every species is active', async () => {
+  const { pickSpawnSpecies } = await loadHelpers();
+
+  const active = new Set(['crow', 'robin', 'jay']);
+  assert.equal(pickSpawnSpecies(BIRDS, active), null);
   assert.equal(pickSpawnSpecies([], new Set()), null);
 });
 
-test('randomBetween interpolates min and max with rng', async () => {
-  const { randomBetween } = await loadHelpers();
-
-  assert.equal(randomBetween(10, 20, () => 0), 10);
-  assert.equal(randomBetween(10, 20, () => 1), 20);
-  assert.equal(randomBetween(10, 20, () => 0.5), 15);
-});
-
-test('getSpawnDelayMs and getBirdLifeMs compute ranges from config', async () => {
+test('spawn delay and bird life stay within configured ranges', async () => {
   const { getSpawnDelayMs, getBirdLifeMs } = await loadHelpers();
-  const cfg = { spawnEveryMin: 1000, spawnEveryMax: 3000, birdLifeMin: 2000, birdLifeMax: 4000 };
 
-  assert.equal(getSpawnDelayMs(cfg, () => 0.5), 2000);
-  assert.equal(getBirdLifeMs(cfg, () => 0.25), 2500);
+  const cfg = {
+    spawnEveryMin: 450,
+    spawnEveryMax: 900,
+    birdLifeMin: 1500,
+    birdLifeMax: 2200,
+  };
+
+  assert.equal(getSpawnDelayMs(cfg, () => 0), 450);
+  assert.equal(getSpawnDelayMs(cfg, () => 0.999), 899.55);
+  assert.equal(getBirdLifeMs(cfg, () => 0), 1500);
+  assert.equal(getBirdLifeMs(cfg, () => 0.999), 2199.3);
 });
 
-test('rectsOverlap detects overlapping bounding squares based on allowance', async () => {
+test('rects overlap only beyond the 30% allowance', async () => {
   const { rectsOverlap } = await loadHelpers();
-  const a = { x: 0, y: 0, size: 100 };
-  const b = { x: 50, y: 50, size: 100 };
-  const far = { x: 200, y: 200, size: 100 };
 
-  assert.equal(rectsOverlap(a, b, 0.3), true);
-  assert.equal(rectsOverlap(a, far, 0.3), false);
+  const a = { x: 0, y: 0, size: 100 };
+  // 50px offset: heavy overlap (>30%) — collides.
+  assert.equal(rectsOverlap(a, { x: 50, y: 0, size: 100 }), true);
+  // 80px offset: only 20px overlap (20%) — allowed.
+  assert.equal(rectsOverlap(a, { x: 80, y: 0, size: 100 }), false);
+  // Fully separate — no overlap.
+  assert.equal(rectsOverlap(a, { x: 200, y: 0, size: 100 }), false);
 });
 
-test('pickSpawnPosition finds valid non-overlapping coordinates inside zone', async () => {
+test('spawn positions stay inside the tree zone', async () => {
   const { pickSpawnPosition } = await loadHelpers();
-  const zone = { xMin: 0.1, xMax: 0.9, yMin: 0.1, yMax: 0.9 };
-  const occupied = [{ x: 100, y: 100, size: 100 }];
 
+  const zone = { xMin: 0.04, xMax: 0.96, yMin: 0.06, yMax: 0.62 };
+  const width = 1000;
+  const height = 500;
+  const size = 100;
+
+  // Cycle rng through the full range to sample many candidate spots.
+  let tick = 0;
+  const rng = () => { tick = (tick + 0.173) % 1; return tick; };
+
+  for (let i = 0; i < 50; i++) {
+    const pos = pickSpawnPosition({ zone, width, height, size, rng });
+    assert.ok(pos.x >= zone.xMin * width, `x ${pos.x} below min`);
+    assert.ok(pos.x <= zone.xMax * width - size, `x ${pos.x} above max`);
+    assert.ok(pos.y >= zone.yMin * height, `y ${pos.y} below min`);
+    assert.ok(pos.y <= zone.yMax * height - size, `y ${pos.y} above max`);
+  }
+});
+
+test('spawn positions avoid occupied spots when a free spot exists', async () => {
+  const { pickSpawnPosition } = await loadHelpers();
+
+  const zone = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 };
+  // Fill the area with a grid of squares so only corners stay free.
+  const occupied = [];
+  for (let x = 100; x <= 700; x += 150) {
+    for (let y = 100; y <= 700; y += 150) {
+      occupied.push({ x, y, size: 100 });
+    }
+  }
+
+  let calls = 0;
+  const rng = () => { calls += 1; return (calls * 0.37) % 1; };
   const pos = pickSpawnPosition({
-    zone,
-    width: 1000,
-    height: 1000,
-    size: 100,
-    occupied,
-    overlapAllowance: 0.3,
-    attempts: 5,
-    rng: () => 0.8,
+    zone, width: 800, height: 800, size: 100, occupied, rng,
   });
 
-  assert.ok(pos.x >= 100 && pos.x <= 800);
-  assert.ok(pos.y >= 100 && pos.y <= 800);
+  const collides = occupied.some(other =>
+    pos.x < other.x + other.size - 30 && pos.x + 100 > other.x + 30 &&
+    pos.y < other.y + other.size - 30 && pos.y + 100 > other.y + 30
+  );
+  assert.equal(collides, false);
 });
