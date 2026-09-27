@@ -1,0 +1,4 @@
+// Top-level build file for the Birdle sideloadable APK wrapper.
+plugins {
+    id 'com.android.application' version '8.6.1' apply false
+}

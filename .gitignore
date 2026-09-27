@@ -1,1 +1,10 @@
 /.venv
+# Android wrapper: generated WebView assets + build outputs
+android/app/src/main/assets/www/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/*.iml
+*.apk
+*.aab

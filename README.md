@@ -27,3 +27,25 @@ It's a static site — no build step.
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
+
+## Android APK (sideload to tablets)
+
+`android/` is a minimal native wrapper that hosts the PWA in a fullscreen
+landscape WebView, fully offline. Launcher icons are generated from the same
+file the PWA manifest uses (`assets/pwa-icon-512.png`).
+
+```bash
+npm run apk:icons  # regenerate launcher icons from the PWA icon
+npm run apk:build  # sync web assets + build the debug APK
+```
+
+The APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`
+(debug-signed, sideloadable). Install on a tablet with USB debugging enabled:
+
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Every push to `main` also builds the APK in CI (`.github/workflows/android.yml`)
+and uploads it as the `birdle-debug-apk` artifact. Bump `versionCode` /
+`versionName` in `android/app/build.gradle` for each release.
