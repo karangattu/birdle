@@ -3,11 +3,15 @@ name: Android APK
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 jobs:
-  build:
+  # Every push/PR proves the wrapper still compiles. Cheap, debug-signed, and never
+  # published -- release APKs come from the release job below.
+  debug:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,3 +45,86 @@ jobs:
         with:
           name: birdle-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  # Push a v1.2.3 tag to publish a signed APK as a GitHub Release. The fixed
+  # asset name means the always-latest link keeps working:
+  #   https://github.com/karangattu/birdle/releases/latest/download/birdle.apk
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+
+      - name: Derive version from tag
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VER="${TAG#v}"
+          if ! [[ "$VER" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Tag '$TAG' is not a vMAJOR.MINOR.PATCH tag" >&2
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}" MINOR="${BASH_REMATCH[2]}" PATCH="${BASH_REMATCH[3]}"
+          # Android caps versionCode at 2100000000; this form leaves plenty of room.
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          echo "name=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Building $TAG (versionName $VER, versionCode $CODE)"
+
+      - name: Sync web assets into WebView
+        run: bash scripts/sync-android-assets.sh
+
+      - name: Build release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --stacktrace \
+            -PbirdleVersionName="${{ steps.version.outputs.name }}" \
+            -PbirdleVersionCode="${{ steps.version.outputs.code }}"
+
+      - name: Verify APK is signed and tagged from the tag
+        env:
+          APK: app/build/outputs/apk/release/app-release.apk
+          WANT_NAME: ${{ steps.version.outputs.name }}
+          WANT_CODE: ${{ steps.version.outputs.code }}
+        working-directory: android
+        run: |
+          set -euo pipefail
+          TOOL="$ANDROID_HOME/build-tools/35.0.0"
+          BADGING="$("$TOOL/aapt" dump badging "$APK")"
+          head -3 <<<"$BADGING"
+          grep -q "versionName='$WANT_NAME'" <<<"$BADGING" \
+            || { echo "APK versionName does not match the tag" >&2; exit 1; }
+          grep -q "versionCode='$WANT_CODE'" <<<"$BADGING" \
+            || { echo "APK versionCode does not match the tag" >&2; exit 1; }
+          head -5 <<<"$("$TOOL/apksigner" verify --print-certs "$APK")"
+          "$TOOL/apksigner" verify "$APK" || { echo "APK is not signed" >&2; exit 1; }
+
+      - name: Stage birdle.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk birdle.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" birdle.apk --clobber
+          else
+            gh release create "$TAG" birdle.apk --title "Birdle $TAG" --generate-notes
+          fi

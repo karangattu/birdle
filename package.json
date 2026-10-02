@@ -6,6 +6,7 @@
     "test": "node --test",
     "apk:sync": "bash scripts/sync-android-assets.sh",
     "apk:icons": "python3 scripts/generate-android-icons.py",
-    "apk:build": "npm run apk:sync && (cd android && ./gradlew assembleDebug)"
+    "apk:build": "npm run apk:sync && (cd android && ./gradlew assembleDebug)",
+    "apk:build:release": "npm run apk:sync && (cd android && ./gradlew assembleRelease)"
   }
 }

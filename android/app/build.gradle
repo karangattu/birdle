@@ -2,6 +2,19 @@ plugins {
     id 'com.android.application'
 }
 
+// Release signing. The key is a committed, self-signed keystore -- see
+// keystore.properties for why that is deliberate. Optional -P overrides let a
+// maintainer sign a build with their own key without editing this file.
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def storeFileProp = project.findProperty('BIRDLE_STORE_FILE') ?: keystoreProps['storeFile']
+def signingConfigured = storeFileProp && rootProject.file(storeFileProp).exists()
+def versionCodeOverride = project.findProperty('birdleVersionCode')
+def versionNameOverride = project.findProperty('birdleVersionName')
+
 android {
     namespace 'org.sfbbo.birdle'
     compileSdk 35
@@ -10,8 +23,22 @@ android {
         applicationId 'org.sfbbo.birdle'
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName '1.0.0'
+        // CI derives both from the release tag (-PbirdleVersionName/-PbirdleVersionCode)
+        // so the tag and the installed app can never disagree. Local builds fall back
+        // to the values below.
+        versionCode (versionCodeOverride != null ? versionCodeOverride.toInteger() : 1)
+        versionName (versionNameOverride ?: '1.0.0-dev')
+    }
+
+    signingConfigs {
+        release {
+            if (signingConfigured) {
+                storeFile rootProject.file(storeFileProp)
+                storePassword (project.findProperty('BIRDLE_STORE_PASSWORD') ?: keystoreProps['storePassword'])
+                keyAlias (project.findProperty('BIRDLE_KEY_ALIAS') ?: keystoreProps['keyAlias'])
+                keyPassword (project.findProperty('BIRDLE_KEY_PASSWORD') ?: keystoreProps['keyPassword'])
+            }
+        }
     }
 
     buildTypes {
@@ -20,7 +47,12 @@ android {
             versionNameSuffix '-debug'
         }
         release {
+            // Nothing to shrink: one Activity, no third-party dependencies, and the
+            // whole game ships as bundled WebView assets that R8 cannot touch anyway.
             minifyEnabled false
+            if (signingConfigured) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
