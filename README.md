@@ -7,3 +7,5 @@ Spot backyard birds in the trees, listen to their calls, and tap the matching na
 ## Birds you'll spot
 
 American Crow · American Robin · Black Phoebe · California Towhee · Cedar Waxwing · Dark-eyed Junco · Hermit Thrush · House Finch · Scrub Jay · Spotted Towhee
+
+![Bird reference sheet](assets/reference_sheet.png)
