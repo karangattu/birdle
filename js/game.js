@@ -1,3 +1,6 @@
+import { BIRDS } from './birds.js';
+import { initializeFieldGuide } from './field-guide.js';
+import { showTakeoff } from './bird-motion.js';
 import {
   LEADERBOARD_LIMIT,
   MAX_LEADERBOARD_NAME_LENGTH,
@@ -20,6 +23,7 @@ import { requestAppFullscreen } from './fullscreen-utils.js';
 import { requestWakeLock, releaseWakeLock } from './wake-lock-utils.js';
 import {
   AUDIO_STATUS,
+  BIRD_CALL_VOLUME,
   audioStatusMessage,
   getMediaAudioStatus,
 } from './audio-utils.js';
@@ -36,20 +40,6 @@ import {
 // Birdle — backyard bird spotting game
 // Vanilla JS (no build step). Designed to be hosted on GitHub Pages.
 
-const BIRDS = [
-  { id: 'american_crow',     name: 'American Crow',     img: 'assets/american_crow.png',     sound: 'assets/american_crow.mp3' },
-  { id: 'american_robin',    name: 'American Robin',    img: 'assets/american_robin.png',    sound: 'assets/american_robin.mp3' },
-  { id: 'black_phoebe',      name: 'Black Phoebe',      img: 'assets/black_phoebe.png',      sound: 'assets/black_phoebe.mp3' },
-  { id: 'california_towhee', name: 'California Towhee', img: 'assets/california_towhee.png', sound: 'assets/california_towhee.mp3' },
-  { id: 'cedar_waxwing',     name: 'Cedar Waxwing',     img: 'assets/cedar_waxwing.png',     sound: 'assets/cedar_waxwing.mp3' },
-  { id: 'dark_eyed_junco',   name: 'Dark-eyed Junco',   img: 'assets/dark_eyed_junco.png',   sound: 'assets/dark_eyed_junco.mp3' },
-  { id: 'hermit_thrush',     name: 'Hermit Thrush',     img: 'assets/hermit_thrush.png',     sound: 'assets/hermit_thrush.mp3' },
-  { id: 'house_finch',       name: 'House Finch',       img: 'assets/house_finch.png',       sound: 'assets/house_finch.mp3' },
-  { id: 'scrub_jay',         name: 'Scrub Jay',         img: 'assets/scrub_jay.png',         sound: 'assets/scrub_jay.mp3' },
-  { id: 'spotted_towhee',    name: 'Spotted Towhee',    img: 'assets/spotted_towhee.png',    sound: 'assets/spotted_towhee.mp3' },
-];
-
-const BIRD_CALL_VOLUME = 0.72;
 const BEEP_VOLUME = 0.08;
 const AUDIO_TIP_HIDE_MS = 5200;
 const AUDIO_REMINDER_HIDE_MS = 4200;
@@ -860,6 +850,7 @@ function removeBird(id, caught, allowGrace = false) {
   const shouldRemember = allowGrace && !caught && state.running;
   state.active.delete(id);
 
+  showTakeoff(entry.el, BIRDS.find(bird => bird.id === entry.species));
   entry.el.classList.add(caught ? 'caught' : 'leaving');
   const removalTimeoutId = setTimeout(() => entry.el.remove(), 450);
   if (shouldRemember) rememberRecentlyExpiredBird(entry, removalTimeoutId);
@@ -1444,6 +1435,8 @@ function preloadBirdCalls() {
   for (const bird of BIRDS) {
     if (birdCallPreloads.has(bird.id)) continue;
     try {
+      const flyingImage = new Image();
+      flyingImage.src = bird.takeoff;
       const audio = new Audio(bird.sound);
       audio.preload = 'auto';
       audio.load();
@@ -1638,6 +1631,7 @@ function onTrainingGuess(speciesId, btnEl) {
     trainingState.call = null;
     if (trainingState.birdEl) {
       const dying = trainingState.birdEl;
+      showTakeoff(dying, BIRDS.find(bird => bird.id === speciesId));
       dying.classList.add('caught');
       setTimeout(() => dying.remove(), 450);
     }
@@ -1678,6 +1672,7 @@ function beginPlay() {
 
 // ---------- Wire up ----------
 function init() {
+  initializeFieldGuide(document, { birds: BIRDS });
   buildBirdButtons();
   resetLeaderboardRoundState();
   initIntro();

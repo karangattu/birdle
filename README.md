@@ -12,6 +12,14 @@ A fast-paced backyard bird-spotting game. Birds appear in the trees and play the
 4. Correct ID = points + combo multiplier. Wrong ID = points off + combo reset.
 5. You have 60 seconds. Best score per difficulty is saved locally, and the global top 5 leaderboard.
 
+## Field guide and bird calls
+
+Open **Field Guide** from the title screen to browse the scrapbook and tap any bird to hear its recording. Tap again to stop; choosing another bird stops the previous call.
+
+The ten shared recordings are normalized to **-18 LUFS** using two-pass FFmpeg loudness normalization, with a **-2 dBTP** peak target. The guide, training, and game use the same recordings and playback level. Each species also has a transparent takeoff image shown briefly before departure; reduced-motion settings use a simple fade.
+
+Sound-note references: [Cornell Lab's Black Phoebe guide](https://www.allaboutbirds.org/guide/Black_Phoebe/sounds) and [Spotted Towhee guide](https://www.allaboutbirds.org/guide/Spotted_Towhee/sounds).
+
 ## Birds you'll spot
 
 American Crow · American Robin · Black Phoebe · California Towhee · Cedar Waxwing · Dark-eyed Junco · Hermit Thrush · House Finch · Scrub Jay · Spotted Towhee

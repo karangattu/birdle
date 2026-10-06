@@ -1,3 +1,6 @@
+// The shared recordings are normalized to -18 LUFS for clear, even calls.
+export const BIRD_CALL_VOLUME = 0.72;
+
 export const AUDIO_STATUS = Object.freeze({
   OK: 'ok',
   RECOMMENDED: 'recommended',

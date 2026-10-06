@@ -1,11 +1,14 @@
 // Birdle service worker — split precache (core + background media)
-const CACHE = 'birdle-v17';
+const CACHE = 'birdle-v19';
 
 const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
   './js/audio-utils.js',
+  './js/birds.js',
+  './js/bird-motion.js',
+  './js/field-guide.js',
   './js/fullscreen-utils.js',
   './js/game.js',
   './js/intro-utils.js',
@@ -49,7 +52,17 @@ const MEDIA_ASSETS = [
   './assets/scrub_jay.png',
   './assets/scrub_jay.mp3',
   './assets/spotted_towhee.png',
-  './assets/spotted_towhee.mp3'
+  './assets/spotted_towhee.mp3',
+  './assets/american_crow_takeoff.png',
+  './assets/american_robin_takeoff.png',
+  './assets/black_phoebe_takeoff.png',
+  './assets/california_towhee_takeoff.png',
+  './assets/cedar_waxwing_takeoff.png',
+  './assets/dark_eyed_junco_takeoff.png',
+  './assets/hermit_thrush_takeoff.png',
+  './assets/house_finch_takeoff.png',
+  './assets/scrub_jay_takeoff.png',
+  './assets/spotted_towhee_takeoff.png'
 ];
 
 self.addEventListener('install', (e) => {

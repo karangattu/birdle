@@ -8,3 +8,6 @@ android/local.properties
 android/*.iml
 *.apk
 *.aab
+
+# Local test dependencies
+node_modules/

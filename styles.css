@@ -878,13 +878,14 @@ button { font-family: inherit; cursor: pointer; border: none; }
   to   { opacity: 1; transform: scale(1)   translateY(0); }
 }
 @keyframes birdOut {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.85); }
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--takeoff-x, 65px), -70px) scale(0.9); }
 }
 @keyframes birdCaught {
   0%   { opacity: 1; transform: scale(1); }
-  60%  { opacity: 1; transform: scale(1.25) rotate(8deg); }
-  100% { opacity: 0; transform: scale(0.4) translateY(-30px) rotate(-12deg); }
+  30%  { opacity: 1; transform: translate(0, -12px) scale(1.1); }
+  100% { opacity: 0; transform: translate(var(--takeoff-x, 65px), -90px) scale(0.85); }
 }
 
 /* Floating score popups */
@@ -1631,3 +1632,257 @@ body.daylight-mode .training-msg {
   color: #000000;
 }
 
+
+/* Scrapbook field guide */
+.field-guide-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 10px 22px;
+  border: 1px solid #c0ad85;
+  border-radius: 4px;
+  background: #ede3cb;
+  color: #303e30;
+  font: italic bold 1rem Georgia, serif;
+}
+.field-guide-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.field-guide-modal {
+  margin: auto;
+  padding: 0;
+  width: min(920px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100dvh - 40px);
+  border: none;
+  border-radius: 4px 14px 14px 4px;
+  background: #ede3cb;
+  box-shadow: 0 24px 70px #000a;
+}
+.field-guide-modal::backdrop { background: #000b; backdrop-filter: blur(6px); }
+.field-guide-content {
+  position: relative;
+  width: 100%;
+  overflow-y: auto;
+  color: #383c2d;
+  background: repeating-linear-gradient(0deg, transparent 0 27px, #b5a47d18 27px 28px), #ede3cb;
+  border: 1px solid #c0ad85;
+  border-radius: 4px 14px 14px 4px;
+  padding: clamp(20px, 3vw, 34px);
+  box-shadow: -6px 0 0 #c7b58e, -9px 0 0 #625741, 0 24px 70px #000a;
+}
+
+.field-guide-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed #9d957b;
+}
+
+.field-guide-kicker {
+  color: #59644a;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.field-guide-header-text h2 {
+  margin: 0;
+  color: #303e30;
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+}
+
+.field-guide-intro {
+  margin-top: 8px;
+  font-family: Georgia, serif;
+  font-size: 0.95rem;
+  color: #645f4e;
+}
+
+.field-guide-close-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #8b8b73;
+  border-radius: 50%;
+  background: #f7efdd;
+  color: #383c2d;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.field-guide-close-btn:hover,
+.field-guide-close-btn:focus-visible {
+  background: #ded4b9;
+  outline: 2px solid #536346;
+  outline-offset: 3px;
+}
+
+.field-guide-scrapbook {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 24px;
+  padding: 8px 5px;
+}
+
+.field-guide-hotspot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 12px 12px 14px;
+  border: 1px solid #c9bea4;
+  border-radius: 1px;
+  color: #373d2e;
+  background: #fffaf0;
+  box-shadow: 2px 4px 7px #51483126;
+  cursor: pointer;
+  text-align: left;
+  transform: rotate(-1.5deg);
+  transition: transform 0.18s, box-shadow 0.18s;
+  touch-action: manipulation;
+}
+
+.field-guide-hotspot:nth-child(even) {
+  transform: rotate(1.5deg);
+  background: #f8f3e4;
+}
+
+.field-guide-hotspot::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: calc(50% - 38px);
+  width: 76px;
+  height: 25px;
+  background: #c4ba8db3;
+  border-left: 1px dashed #b5aa7d;
+  border-right: 1px dashed #b5aa7d;
+  transform: rotate(-5deg);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.field-guide-hotspot:nth-child(4n + 2)::before { background: #a8b7a0b3; }
+.field-guide-hotspot:nth-child(4n + 3)::before { background: #cea68cb3; }
+.field-guide-hotspot:nth-child(4n)::before { background: #acb6bdb3; }
+
+.field-guide-photo {
+  position: relative;
+  display: block;
+  background: radial-gradient(ellipse at center, #f2e6c8, #ded5be);
+  margin-bottom: 12px;
+}
+
+.field-guide-photo img {
+  display: block;
+  width: 100%;
+  height: clamp(100px, 18vh, 160px);
+  object-fit: contain;
+}
+
+.field-guide-number {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  font: 0.7rem monospace;
+  color: #5d634f;
+}
+
+.field-guide-bird-name {
+  font: bold clamp(1rem, 2.3vw, 1.3rem) Georgia, serif;
+}
+
+
+.field-guide-call-note {
+  margin-top: 12px;
+  color: #64503d;
+  font: italic 1.15rem 'Segoe Print', 'Bradley Hand', cursive;
+}
+
+.field-guide-note {
+  flex: 1;
+  margin-top: 5px;
+  font: 0.8rem/1.5 Georgia, serif;
+}
+
+.field-guide-listen {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 9px;
+  border-top: 1px dashed #c9bea4;
+  font: 0.7rem monospace;
+  color: #47573c;
+}
+
+.field-guide-play-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e3e8d5;
+}
+
+.field-guide-hotspot:hover,
+.field-guide-hotspot:focus-visible,
+.field-guide-hotspot.active {
+  transform: rotate(0deg) translateY(-2px);
+  outline: 2px solid #576b44;
+  outline-offset: 3px;
+  box-shadow: 3px 7px 12px #51483133;
+}
+
+.field-guide-hotspot.active .field-guide-play-icon {
+  color: #fffaf0;
+  background: #47573c;
+}
+
+.field-guide-status {
+  margin: 22px 0 0;
+  text-align: center;
+  font: italic 0.95rem Georgia, serif;
+  color: #47573c;
+}
+
+.field-guide-footer {
+  margin-top: 12px;
+  text-align: center;
+  font: 0.6rem monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #726951;
+}
+
+.field-guide-calls { display: none; }
+
+@media (max-width: 480px) {
+  .field-guide-modal { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .field-guide-content { padding: 20px 16px; }
+  .field-guide-scrapbook { gap: 24px 14px; }
+  .field-guide-hotspot { padding: 8px 8px 12px; }
+  .field-guide-call-note { font-size: 0.95rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-guide-hotspot { transition: none; }
+}
+
+
+@media (max-width: 700px) {
+  .field-guide-scrapbook { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.bird.taking-off.flip { --takeoff-x: -65px; }
+@media (prefers-reduced-motion: reduce) {
+  .bird.leaving, .bird.caught { animation: birdFade .35s ease both; }
+}
+@keyframes birdFade { from { opacity: 1; } to { opacity: 0; } }

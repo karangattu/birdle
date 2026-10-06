@@ -42,6 +42,7 @@
       <img class="org-logo" src="assets/sfbbo_logo.png" alt="SFBBO" />
       <div class="start-overlay">
         <button id="btn-start" class="big-btn">Start Game</button>
+        <button id="field-guide-btn" class="field-guide-btn" type="button">Field Guide</button>
         <p class="hint">Spot the birds. Tap the matching button. Don't get fooled.</p>
         <p id="start-bests" class="start-bests"></p>
         <p id="start-feedback" class="start-feedback" aria-live="polite"></p>
@@ -53,6 +54,23 @@
         <p id="leaderboard-start-high" class="start-leaderboard-high" aria-live="polite">Global leaderboard high score: loading...</p>
       </div>
     </section>
+
+    <dialog id="field-guide-modal" class="field-guide-modal" aria-labelledby="field-guide-title">
+      <div class="field-guide-content">
+        <div class="field-guide-header">
+          <div class="field-guide-header-text">
+            <p class="field-guide-kicker">Notes from the backyard</p>
+            <h2 id="field-guide-title">Field Guide</h2>
+            <p class="field-guide-intro">Ten familiar voices, collected among the trees.</p>
+          </div>
+          <button id="field-guide-close-btn" class="field-guide-close-btn" type="button" aria-label="Close field guide">&times;</button>
+        </div>
+        <div id="field-guide-cards" class="field-guide-scrapbook"></div>
+        <p id="field-guide-status" class="field-guide-status" aria-live="polite">Tap a bird to hear its call.</p>
+        <p class="field-guide-footer">Backyard collection &nbsp; / &nbsp; Birdle</p>
+        <div id="field-guide-calls" hidden></div>
+      </div>
+    </dialog>
 
     <!-- Training Screen (interactive walkthrough before first game) -->
     <section id="screen-training" class="screen">

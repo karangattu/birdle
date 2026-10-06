@@ -1,0 +1,13 @@
+export const BIRDS = [
+  { id: 'american_crow',     name: 'American Crow',     img: 'assets/american_crow.png',     sound: 'assets/american_crow.mp3', takeoff: 'assets/american_crow_takeoff.png', callNote: "caw \u00b7 caw \u00b7 caw", note: "Look for glossy black feathers and a sturdy bill." },
+  { id: 'american_robin',    name: 'American Robin',    img: 'assets/american_robin.png',    sound: 'assets/american_robin.mp3', takeoff: 'assets/american_robin_takeoff.png', callNote: "cheer-up, cheerily", note: "The orange breast makes a handy spotting clue." },
+  { id: 'black_phoebe',      name: 'Black Phoebe',      img: 'assets/black_phoebe.png',      sound: 'assets/black_phoebe.mp3', takeoff: 'assets/black_phoebe_takeoff.png', callNote: "tee-hee · tee-hoo", note: "Dark above, bright white below. A neat little contrast." },
+  { id: 'california_towhee', name: 'California Towhee', img: 'assets/california_towhee.png', sound: 'assets/california_towhee.mp3', takeoff: 'assets/california_towhee_takeoff.png', callNote: "chip!", note: "Soft brown plumage with a warm, rusty patch under the tail." },
+  { id: 'cedar_waxwing',     name: 'Cedar Waxwing',     img: 'assets/cedar_waxwing.png',     sound: 'assets/cedar_waxwing.mp3', takeoff: 'assets/cedar_waxwing_takeoff.png', callNote: "thin, high whistles", note: "A swept-back crest, dark mask, and yellow-tipped tail." },
+  { id: 'dark_eyed_junco',   name: 'Dark-eyed Junco',   img: 'assets/dark_eyed_junco.png',   sound: 'assets/dark_eyed_junco.mp3', takeoff: 'assets/dark_eyed_junco_takeoff.png', callNote: "a bright little trill", note: "Notice the small pale bill against the darker head." },
+  { id: 'hermit_thrush',     name: 'Hermit Thrush',     img: 'assets/hermit_thrush.png',     sound: 'assets/hermit_thrush.mp3', takeoff: 'assets/hermit_thrush_takeoff.png', callNote: "a flute-like phrase", note: "A spotted breast and warm brown tail. Take a closer look." },
+  { id: 'house_finch',       name: 'House Finch',       img: 'assets/house_finch.png',       sound: 'assets/house_finch.mp3', takeoff: 'assets/house_finch_takeoff.png', callNote: "a cheerful warble", note: "Look for the rosy red head and streaky sides." },
+  { id: 'scrub_jay',         name: 'Scrub Jay',         img: 'assets/scrub_jay.png',         sound: 'assets/scrub_jay.mp3', takeoff: 'assets/scrub_jay_takeoff.png', callNote: "shreep!", note: "Blue wings, a long tail, and a pale throat." },
+  { id: 'spotted_towhee',    name: 'Spotted Towhee',    img: 'assets/spotted_towhee.png',    sound: 'assets/spotted_towhee.mp3', takeoff: 'assets/spotted_towhee_takeoff.png', callNote: "a quick, dry trill", note: "Dark head, rusty sides, and bright spots on the wings." },
+];
+
