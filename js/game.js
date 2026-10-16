@@ -21,11 +21,15 @@ import {
 } from './pwa-install-utils.js';
 import { requestAppFullscreen } from './fullscreen-utils.js';
 import { requestWakeLock, releaseWakeLock } from './wake-lock-utils.js';
+import { shouldUseSunlightMode } from './sunlight-utils.js';
 import {
   AUDIO_STATUS,
   BIRD_CALL_VOLUME,
+  BOOSTED_BIRD_CALL_VOLUME,
   audioStatusMessage,
   getMediaAudioStatus,
+  getBirdCallVolume,
+  isVoiceBoostEnabled,
 } from './audio-utils.js';
 import { getHitPoints, clampScore } from './scoring-utils.js';
 import { getRankProgress } from './rank-utils.js';
@@ -205,6 +209,9 @@ const installPromptState = {
 };
 
 let nextBirdId = 1;
+let isDaylightModeActive = false;
+let voiceBoostManual = false;
+try { voiceBoostManual = isVoiceBoostEnabled(); } catch (_) {}
 
 // ---------- Screen control ----------
 function showScreen(name) {
@@ -666,6 +673,22 @@ function openLeaderboardForm() {
   leaderboardState.skippedThisGame = false;
   syncLeaderboardSubmitCard();
   setSubmitFeedback('');
+  const voiceBoostBtn = $('#btn-toggle-voice-boost');
+  if (voiceBoostBtn) {
+    const setVoiceBoost = (enabled) => {
+      voiceBoostManual = Boolean(enabled);
+      voiceBoostBtn.textContent = enabled ? '🔊 Voice Boost: On' : '🔊 Voice Boost';
+      try {
+        localStorage.setItem('birdle_voice_boost', String(enabled));
+      } catch (_) {}
+      updateBirdCallVolumes();
+    };
+    voiceBoostBtn.addEventListener('click', () => {
+      setVoiceBoost(!voiceBoostManual);
+    });
+    setVoiceBoost(voiceBoostManual);
+  }
+
   if (leaderboardEls.submitName) {
     leaderboardEls.submitName.focus();
     leaderboardEls.submitName.select();
@@ -1420,7 +1443,7 @@ function configureBirdCallAudio(audio) {
 
   try {
     audio.muted = false;
-    audio.volume = BIRD_CALL_VOLUME;
+    audio.volume = getBirdCallVolume({ boosted: voiceBoostManual || isDaylightModeActive });
   } catch (_) {
     reportAudioStatus(AUDIO_STATUS.UNSUPPORTED);
     return;
@@ -1428,6 +1451,14 @@ function configureBirdCallAudio(audio) {
 
   if (previousStatus === AUDIO_STATUS.MUTED || previousStatus === AUDIO_STATUS.LOW) {
     reportAudioStatus(previousStatus);
+  }
+}
+
+function updateBirdCallVolumes() {
+  const boosted = voiceBoostManual || isDaylightModeActive;
+  const volume = getBirdCallVolume({ boosted });
+  for (const audio of birdCallPreloads.values()) {
+    try { audio.volume = volume; } catch (_) {}
   }
 }
 
@@ -1679,30 +1710,73 @@ function init() {
 
   const daylightBtn = $('#btn-toggle-daylight');
   if (daylightBtn) {
-    let isDaylightMode = false;
+    const matchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia.bind(window)
+      : null;
+    let manualPreference = null;
     try {
-      isDaylightMode = localStorage.getItem('birdle_daylight_mode') === 'true';
+      const stored = localStorage.getItem('birdle_daylight_mode');
+      if (stored === 'true') manualPreference = 'light';
+      else if (stored === 'false') manualPreference = 'dark';
     } catch (_) {}
-    if (isDaylightMode) {
-      document.body.classList.add('daylight-mode');
-      daylightBtn.textContent = '☾ Dark Mode';
-    } else {
-      document.body.classList.remove('daylight-mode');
-      daylightBtn.textContent = '☀ Broad Daylight Mode';
-    }
-    daylightBtn.addEventListener('click', () => {
-      isDaylightMode = !isDaylightMode;
-      if (isDaylightMode) {
-        document.body.classList.add('daylight-mode');
+
+    const setDaylightMode = (enabled) => {
+      isDaylightModeActive = Boolean(enabled);
+      if (enabled) {
+        document.body.classList.add('daylight-mode', 'sunlight-mode');
         daylightBtn.textContent = '☾ Dark Mode';
       } else {
-        document.body.classList.remove('daylight-mode');
+        document.body.classList.remove('daylight-mode', 'sunlight-mode');
         daylightBtn.textContent = '☀ Broad Daylight Mode';
       }
+      updateBirdCallVolumes();
+    };
+
+    let isDaylightMode = shouldUseSunlightMode({
+      matchMedia,
+      manualPreference,
+    });
+    setDaylightMode(isDaylightMode);
+
+    daylightBtn.addEventListener('click', () => {
+      manualPreference = isDaylightMode ? 'dark' : 'light';
+      isDaylightMode = !isDaylightMode;
+      setDaylightMode(isDaylightMode);
       try {
         localStorage.setItem('birdle_daylight_mode', String(isDaylightMode));
       } catch (_) {}
     });
+
+    if (manualPreference === null && matchMedia) {
+      const updateAutomatically = () => {
+        if (manualPreference !== null) return;
+        const auto = shouldUseSunlightMode({ matchMedia });
+        if (auto !== isDaylightMode) {
+          isDaylightMode = auto;
+          setDaylightMode(isDaylightMode);
+        }
+      };
+      const washed = matchMedia('(light-level: washed)');
+      const contrast = matchMedia('(prefers-contrast: more)');
+      washed?.addEventListener?.('change', updateAutomatically);
+      contrast?.addEventListener?.('change', updateAutomatically);
+    }
+
+    // Calibrate once on load using the Ambient Light Sensor when available.
+    if (manualPreference === null && typeof window !== 'undefined' && 'AmbientLightSensor' in window) {
+      try {
+        const sensor = new window.AmbientLightSensor();
+        sensor.addEventListener('reading', () => {
+          if (manualPreference !== null) return;
+          const auto = shouldUseSunlightMode({ matchMedia, ambientLight: sensor.illuminance });
+          if (auto !== isDaylightMode) {
+            isDaylightMode = auto;
+            setDaylightMode(isDaylightMode);
+          }
+        });
+        sensor.start();
+      } catch (_) { /* sensor is best-effort */ }
+    }
   }
 
   if (leaderboardEls.submitName) {

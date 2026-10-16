@@ -1,4 +1,4 @@
-import { BIRD_CALL_VOLUME } from './audio-utils.js';
+import { getBirdCallVolume, isVoiceBoostEnabled, VOICE_BOOST_STORAGE_KEY } from './audio-utils.js';
 
 const IDLE_STATUS = 'Tap a bird to hear its call.';
 
@@ -41,7 +41,7 @@ export function initializeFieldGuide(document, { birds }) {
     audio.dataset.bird = bird.id;
     audio.src = bird.sound;
     audio.preload = 'none';
-    audio.volume = BIRD_CALL_VOLUME;
+    audio.volume = getBirdCallVolume({ boosted: isVoiceBoostEnabled() || (typeof document !== 'undefined' && document.body?.classList?.contains('daylight-mode')) });
     calls.appendChild(audio);
     const entry = { button, audio };
 

@@ -1,5 +1,19 @@
 // The shared recordings are normalized to -18 LUFS for clear, even calls.
 export const BIRD_CALL_VOLUME = 0.72;
+export const BOOSTED_BIRD_CALL_VOLUME = 0.98;
+export const VOICE_BOOST_STORAGE_KEY = 'birdle_voice_boost';
+
+export function isVoiceBoostEnabled(storage = (typeof globalThis !== 'undefined' ? globalThis.localStorage : null)) {
+  try {
+    return storage?.getItem(VOICE_BOOST_STORAGE_KEY) === 'true';
+  } catch (_) {
+    return false;
+  }
+}
+
+export function getBirdCallVolume({ boosted = false } = {}) {
+  return boosted ? BOOSTED_BIRD_CALL_VOLUME : BIRD_CALL_VOLUME;
+}
 
 export const AUDIO_STATUS = Object.freeze({
   OK: 'ok',
