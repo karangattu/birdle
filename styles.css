@@ -673,6 +673,18 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .leaderboard-submit-feedback.info { color: #ffd84a; }
 .leaderboard-submit-feedback.success { color: #9cffb8; }
 .leaderboard-submit-feedback.error { color: #ff9e9e; }
+.leaderboard-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #ffd84a;
+  border: 1px solid rgba(255,216,74,0.5);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 
 .sfbbo-plug {
   margin-top: 18px;

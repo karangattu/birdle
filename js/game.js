@@ -4,10 +4,17 @@ import { showTakeoff } from './bird-motion.js';
 import {
   LEADERBOARD_LIMIT,
   MAX_LEADERBOARD_NAME_LENGTH,
+  getCombinedLeaderboardEntries,
   getUniqueLeaderboardEntries,
+  isOfflineError,
+  loadPendingScores,
+  queuePendingScore,
+  readCachedLeaderboard,
+  removePendingScore,
   scoreQualifies,
   sortLeaderboardEntries,
   validateLeaderboardName,
+  writeCachedLeaderboard,
 } from './leaderboard-utils.js';
 import {
   getIntroTimeoutMs,
@@ -181,14 +188,18 @@ const state = {
 
 const leaderboardState = {
   entries: [],
+  pendingEntries: [],
   phase: supabaseClient ? 'idle' : 'disabled',
   errorMessage: '',
   fetchPromise: null,
+  flushPromise: null,
   submitting: false,
   formVisible: false,
   submittedThisGame: false,
+  queuedThisGame: false,
   skippedThisGame: false,
   lastSubmittedName: '',
+  lastQueuedName: '',
 };
 
 const introState = {
@@ -419,12 +430,39 @@ function setSubmitFeedback(message = '', tone = '') {
   if (tone) el.classList.add(tone);
 }
 
+function getLeaderboardStorage() {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch (_) {}
+  return null;
+}
+
+function isBrowserOnline() {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') {
+      return navigator.onLine;
+    }
+  } catch (_) {}
+  return true;
+}
+
+function refreshPendingEntries() {
+  leaderboardState.pendingEntries = loadPendingScores(getLeaderboardStorage());
+  return leaderboardState.pendingEntries;
+}
+
+function getVisibleLeaderboardEntries() {
+  return getCombinedLeaderboardEntries(leaderboardState.entries, leaderboardState.pendingEntries);
+}
+
 function resetLeaderboardRoundState() {
   leaderboardState.submitting = false;
   leaderboardState.formVisible = false;
   leaderboardState.submittedThisGame = false;
+  leaderboardState.queuedThisGame = false;
   leaderboardState.skippedThisGame = false;
   leaderboardState.lastSubmittedName = '';
+  leaderboardState.lastQueuedName = '';
   setLeaderboardControlsDisabled(false);
   setSubmitFeedback('');
   if (leaderboardEls.submitName) leaderboardEls.submitName.value = '';
@@ -468,10 +506,17 @@ function createLeaderboardItem(entry, index) {
   meta.className = 'leaderboard-entry-meta';
   meta.append(createDifficultyBadge(entry.difficulty));
 
-  const date = document.createElement('span');
-  date.className = 'leaderboard-entry-date';
-  date.textContent = formatLeaderboardDate(entry.created_at);
-  meta.append(date);
+  if (entry.pending) {
+    const pendingBadge = document.createElement('span');
+    pendingBadge.className = 'leaderboard-pending-badge';
+    pendingBadge.textContent = 'on this device';
+    meta.append(pendingBadge);
+  } else {
+    const date = document.createElement('span');
+    date.className = 'leaderboard-entry-date';
+    date.textContent = formatLeaderboardDate(entry.created_at);
+    meta.append(date);
+  }
 
   main.append(name, meta);
 
@@ -487,21 +532,33 @@ function leaderboardUnavailableMessage() {
   if (leaderboardState.errorMessage.includes('Could not find the table')) {
     return 'Run the Supabase leaderboard SQL setup to enable global scores.';
   }
+  if (!isBrowserOnline()) {
+    return 'You are offline. Scores are saved on this device and sync later.';
+  }
   return 'Global leaderboard unavailable right now.';
 }
 
 function leaderboardStatusText() {
-  if (leaderboardState.phase === 'disabled') return 'Global leaderboard is unavailable right now.';
+  const visibleCount = getVisibleLeaderboardEntries().length;
+  const pendingCount = leaderboardState.pendingEntries.length;
+  const pendingSuffix = pendingCount > 0
+    ? ` (${pendingCount} saved on this device${leaderboardState.phase === 'ready' ? ', syncing…' : ''})`
+    : '';
+  if (leaderboardState.phase === 'disabled') {
+    return pendingCount > 0
+      ? `Offline scores on this device.${pendingSuffix}`
+      : 'Global leaderboard is unavailable right now.';
+  }
   if (leaderboardState.phase === 'loading') {
-    return leaderboardState.entries.length ? 'Refreshing global high scores...' : 'Loading global high scores...';
+    if (visibleCount > 0) return `Refreshing global high scores...${pendingSuffix}`;
+    return 'Loading global high scores...';
   }
   if (leaderboardState.phase === 'error') {
-    return leaderboardState.entries.length
-      ? 'Showing the last loaded scores.'
-      : leaderboardUnavailableMessage();
+    if (visibleCount > 0) return `Showing scores saved on this device.${pendingSuffix}`;
+    return leaderboardUnavailableMessage();
   }
-  if (leaderboardState.entries.length === 0) return 'No scores submitted yet.';
-  return 'Top 5 high scores';
+  if (visibleCount === 0) return 'No scores submitted yet.';
+  return `Top ${LEADERBOARD_LIMIT} high scores${pendingSuffix}`;
 }
 
 function renderLeaderboardList(listEl, statusEl) {
@@ -510,17 +567,18 @@ function renderLeaderboardList(listEl, statusEl) {
   statusEl.textContent = leaderboardStatusText();
   listEl.textContent = '';
 
-  const entries = getUniqueLeaderboardEntries(leaderboardState.entries).slice(0, LEADERBOARD_LIMIT);
+  const entries = getUniqueLeaderboardEntries(getVisibleLeaderboardEntries()).slice(0, LEADERBOARD_LIMIT);
   for (const [index, entry] of entries.entries()) {
     listEl.appendChild(createLeaderboardItem(entry, index));
   }
 }
 
 function startLeaderboardHighText() {
-  const topEntry = getUniqueLeaderboardEntries(leaderboardState.entries)[0];
+  const topEntry = getUniqueLeaderboardEntries(getVisibleLeaderboardEntries())[0];
   if (topEntry) {
     const playerName = topEntry.player_name || 'Player';
-    return `Global leaderboard high score: ${topEntry.score} by ${playerName}`;
+    const suffix = topEntry.pending ? ' (saved on this device)' : '';
+    return `Global leaderboard high score: ${topEntry.score} by ${playerName}${suffix}`;
   }
 
   if (leaderboardState.phase === 'loading') return 'Global leaderboard high score: loading...';
@@ -542,14 +600,6 @@ function syncLeaderboardSubmitCard() {
   const card = leaderboardEls.submitCard;
   if (!card) return;
 
-  if (leaderboardState.phase === 'disabled') {
-    card.hidden = false;
-    leaderboardEls.submitButtons.hidden = true;
-    leaderboardEls.submitForm.hidden = true;
-    leaderboardEls.submitMessage.textContent = 'Global score submission is unavailable right now.';
-    return;
-  }
-
   if (leaderboardState.submittedThisGame) {
     card.hidden = false;
     leaderboardEls.submitButtons.hidden = true;
@@ -559,7 +609,43 @@ function syncLeaderboardSubmitCard() {
     return;
   }
 
-  if (leaderboardState.phase === 'loading' && leaderboardState.entries.length === 0) {
+  if (leaderboardState.queuedThisGame) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = `Score saved on this device as ${leaderboardState.lastQueuedName}. It will sync when you're back online.`;
+    setSubmitFeedback(
+      leaderboardState.pendingEntries.length > 0
+        ? `${leaderboardState.pendingEntries.length} score${leaderboardState.pendingEntries.length === 1 ? '' : 's'} waiting to sync.`
+        : 'Saved on this device.',
+      'success',
+    );
+    return;
+  }
+
+  const visibleEntries = getVisibleLeaderboardEntries();
+  const hasVisibleScores = visibleEntries.length > 0;
+
+  if (leaderboardState.phase === 'disabled' && !hasVisibleScores && !isBrowserOnline()) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = false;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitButtons.hidden = leaderboardState.formVisible;
+    leaderboardEls.submitForm.hidden = !leaderboardState.formVisible;
+    leaderboardEls.submitMessage.textContent = "You're offline. Save this run on this device?";
+    if (!leaderboardState.formVisible && !leaderboardState.submitting) setSubmitFeedback('');
+    return;
+  }
+
+  if (leaderboardState.phase === 'disabled' && !hasVisibleScores) {
+    card.hidden = false;
+    leaderboardEls.submitButtons.hidden = true;
+    leaderboardEls.submitForm.hidden = true;
+    leaderboardEls.submitMessage.textContent = 'Global score submission is unavailable right now.';
+    return;
+  }
+
+  if (leaderboardState.phase === 'loading' && !hasVisibleScores) {
     card.hidden = false;
     leaderboardEls.submitButtons.hidden = true;
     leaderboardEls.submitForm.hidden = true;
@@ -567,17 +653,20 @@ function syncLeaderboardSubmitCard() {
     return;
   }
 
-  if (leaderboardState.phase === 'error' && leaderboardState.entries.length === 0) {
+  if (leaderboardState.phase === 'error' && !hasVisibleScores) {
+    // Fully offline with nothing cached: still let the player keep the score locally.
     card.hidden = false;
-    leaderboardEls.submitButtons.hidden = true;
-    leaderboardEls.submitForm.hidden = true;
-    leaderboardEls.submitMessage.textContent = leaderboardUnavailableMessage();
+    leaderboardEls.submitButtons.hidden = leaderboardState.formVisible;
+    leaderboardEls.submitForm.hidden = !leaderboardState.formVisible;
+    leaderboardEls.submitMessage.textContent = `${leaderboardUnavailableMessage()} Save this run on this device?`;
+    if (!leaderboardState.formVisible && !leaderboardState.submitting) setSubmitFeedback('');
     return;
   }
 
-  const qualifies = scoreQualifies(state.score, leaderboardState.entries, LEADERBOARD_LIMIT);
-  const cutoff = leaderboardState.entries.length >= LEADERBOARD_LIMIT
-    ? leaderboardState.entries[LEADERBOARD_LIMIT - 1].score
+  const qualifies = scoreQualifies(state.score, visibleEntries, LEADERBOARD_LIMIT);
+  const sortedVisible = sortLeaderboardEntries(visibleEntries);
+  const cutoff = sortedVisible.length >= LEADERBOARD_LIMIT
+    ? sortedVisible[LEADERBOARD_LIMIT - 1].score
     : null;
 
   if (!qualifies) {
@@ -598,17 +687,91 @@ function syncLeaderboardSubmitCard() {
   }
 
   card.hidden = false;
-  leaderboardEls.submitMessage.textContent = leaderboardState.entries.length < LEADERBOARD_LIMIT
+  const offlineNote = !isBrowserOnline() ? ' You are offline — it will be saved on this device first.' : '';
+  leaderboardEls.submitMessage.textContent = (visibleEntries.length < LEADERBOARD_LIMIT
     ? 'You opened a new spot on the global leaderboard. Submit your score?'
-    : `You cracked the global top ${LEADERBOARD_LIMIT}. Submit your score?`;
+    : `You cracked the global top ${LEADERBOARD_LIMIT}. Submit your score?`) + offlineNote;
   leaderboardEls.submitButtons.hidden = leaderboardState.formVisible;
   leaderboardEls.submitForm.hidden = !leaderboardState.formVisible;
-  if (!leaderboardState.formVisible && !leaderboardState.submitting) setSubmitFeedback('');
+  if (!leaderboardState.formVisible && !leaderboardState.submitting) {
+    setSubmitFeedback(
+      leaderboardState.pendingEntries.length > 0 && isBrowserOnline()
+        ? 'Syncing offline scores...'
+        : '',
+      leaderboardState.pendingEntries.length > 0 ? 'info' : '',
+    );
+  }
+}
+
+function queueScoreLocally(playerName) {
+  const pending = queuePendingScore(getLeaderboardStorage(), {
+    player_name: playerName,
+    score: state.score,
+    difficulty: state.level,
+    best_combo: state.bestCombo,
+    hits: state.hits,
+    misses: state.misses,
+  });
+  leaderboardState.pendingEntries = pending;
+  leaderboardState.lastQueuedName = playerName;
+  leaderboardState.queuedThisGame = true;
+  leaderboardState.submittedThisGame = false;
+  leaderboardState.skippedThisGame = false;
+  leaderboardState.formVisible = false;
+  renderLeaderboardLists();
+}
+
+async function flushPendingScores() {
+  if (!supabaseClient || leaderboardState.flushPromise) {
+    return leaderboardState.flushPromise || [];
+  }
+  refreshPendingEntries();
+  if (leaderboardState.pendingEntries.length === 0 || !isBrowserOnline()) return [];
+
+  leaderboardState.flushPromise = (async () => {
+    const storage = getLeaderboardStorage();
+    const queue = [...leaderboardState.pendingEntries];
+    for (const entry of queue) {
+      if (!isBrowserOnline()) break;
+      try {
+        const { error } = await supabaseClient.from(LEADERBOARD_TABLE).insert({
+          player_name: entry.player_name,
+          score: entry.score,
+          difficulty: entry.difficulty,
+          best_combo: entry.best_combo,
+          hits: entry.hits,
+          misses: entry.misses,
+        });
+        if (error) {
+          if (isOfflineError(error)) break;
+          // Validation / server rejections should not block the rest of the queue.
+          // Drop unprocessable rows so one bad name cannot wedge the queue.
+          removePendingScore(storage, entry.id);
+          continue;
+        }
+        removePendingScore(storage, entry.id);
+      } catch (error) {
+        if (isOfflineError(error) || !isBrowserOnline()) break;
+        // Unknown error: keep the entry and stop this pass to avoid a hot loop.
+        break;
+      }
+    }
+    refreshPendingEntries();
+    renderLeaderboardLists();
+    syncLeaderboardSubmitCard();
+    return leaderboardState.pendingEntries;
+  })().finally(() => {
+    leaderboardState.flushPromise = null;
+  });
+
+  return leaderboardState.flushPromise;
 }
 
 async function loadGlobalLeaderboard(force = false) {
+  refreshPendingEntries();
   if (!supabaseClient) {
     leaderboardState.phase = 'disabled';
+    leaderboardState.entries = readCachedLeaderboard(getLeaderboardStorage());
     renderLeaderboardLists();
     syncLeaderboardSubmitCard();
     return [];
@@ -629,18 +792,24 @@ async function loadGlobalLeaderboard(force = false) {
     .then(({ data, error }) => {
       if (error) throw error;
       leaderboardState.entries = sortLeaderboardEntries(data || []);
+      writeCachedLeaderboard(getLeaderboardStorage(), leaderboardState.entries);
       leaderboardState.phase = 'ready';
       return leaderboardState.entries;
     })
     .catch((error) => {
       leaderboardState.phase = 'error';
       leaderboardState.errorMessage = error?.message || 'Global leaderboard unavailable right now.';
+      const cached = readCachedLeaderboard(getLeaderboardStorage());
+      if (cached.length > 0 && leaderboardState.entries.length === 0) {
+        leaderboardState.entries = cached;
+      }
       return leaderboardState.entries;
     })
     .finally(() => {
       leaderboardState.fetchPromise = null;
       renderLeaderboardLists();
       syncLeaderboardSubmitCard();
+      if (leaderboardState.phase === 'ready') void flushPendingScores();
     });
 
   return leaderboardState.fetchPromise;
@@ -712,11 +881,21 @@ function skipLeaderboardSubmission() {
 
 async function submitLeaderboardScore(event) {
   event.preventDefault();
-  if (leaderboardState.submitting || !supabaseClient) return;
+  if (leaderboardState.submitting) return;
 
   const validation = validateLeaderboardName(leaderboardEls.submitName.value);
   if (!validation.ok) {
     setSubmitFeedback(validation.message, 'error');
+    return;
+  }
+
+  // Offline-first: no client (misconfigured Supabase) or no network means
+  // the score is kept on-device instead of dropped. This is the Android
+  // offline path — the APK runs from file:// with localStorage persistence.
+  if (!supabaseClient || !isBrowserOnline()) {
+    queueScoreLocally(validation.value);
+    setLeaderboardControlsDisabled(false);
+    syncLeaderboardSubmitCard();
     return;
   }
 
@@ -738,10 +917,18 @@ async function submitLeaderboardScore(event) {
 
     leaderboardState.lastSubmittedName = validation.value;
     leaderboardState.submittedThisGame = true;
+    leaderboardState.queuedThisGame = false;
     leaderboardState.skippedThisGame = false;
     leaderboardState.formVisible = false;
     await loadGlobalLeaderboard(true);
+    await flushPendingScores();
   } catch (error) {
+    if (isOfflineError(error) || !isBrowserOnline()) {
+      queueScoreLocally(validation.value);
+      setLeaderboardControlsDisabled(false);
+      syncLeaderboardSubmitCard();
+      return;
+    }
     setSubmitFeedback(
       error?.message ? `Could not submit score: ${error.message}` : 'Could not submit score right now.',
       'error'
@@ -1822,9 +2009,24 @@ function init() {
 
   refreshBestPreview();
   syncInstallPrompt();
+  refreshPendingEntries();
+  if (leaderboardState.pendingEntries.length > 0 && leaderboardState.entries.length === 0) {
+    leaderboardState.entries = readCachedLeaderboard(getLeaderboardStorage());
+  }
   renderLeaderboardLists();
+  syncLeaderboardSubmitCard();
   void loadGlobalLeaderboard();
   subscribeToLeaderboardChanges();
+  window.addEventListener('online', () => {
+    renderLeaderboardLists();
+    syncLeaderboardSubmitCard();
+    void loadGlobalLeaderboard(true);
+  });
+  window.addEventListener('offline', () => {
+    refreshPendingEntries();
+    renderLeaderboardLists();
+    syncLeaderboardSubmitCard();
+  });
 
   // Register service worker for offline play
   if ('serviceWorker' in navigator) {

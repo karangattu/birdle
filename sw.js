@@ -1,5 +1,5 @@
 // Birdle service worker — split precache (core + background media)
-const CACHE = 'birdle-v20';
+const CACHE = 'birdle-v21';
 
 const CORE_ASSETS = [
   './',
